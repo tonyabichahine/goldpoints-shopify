@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation'
 
 export default function Home() {
   const [shop, setShop] = useState('')
-  const [adminPw, setAdminPw] = useState('')
-  const [tab, setTab] = useState<'merchant' | 'admin'>('merchant')
+  const [customerShop, setCustomerShop] = useState('')
+  const [tab, setTab] = useState<'merchant' | 'customer'>('merchant')
   const router = useRouter()
 
   function connectShopify() {
@@ -14,9 +14,10 @@ export default function Home() {
     window.location.href = `/api/auth/install?shop=${domain}`
   }
 
-  async function adminLogin() {
-    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPw }) })
-    if (r.ok) { router.push('/admin') } else { alert('Wrong password') }
+  function goToPortal() {
+    if (!customerShop) return
+    const domain = customerShop.includes('.myshopify.com') ? customerShop : `${customerShop}.myshopify.com`
+    router.push(`/portal/${encodeURIComponent(domain)}`)
   }
 
   return (
@@ -26,8 +27,8 @@ export default function Home() {
 
       <div className="w-full max-w-md bg-[#16162a] border border-white/10 rounded-2xl p-8">
         <div className="flex gap-2 mb-6">
-          <button onClick={() => setTab('merchant')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition ${tab==='merchant'?'bg-purple-600 text-white':'text-gray-400 hover:text-white'}`}>Merchant Login</button>
-          <button onClick={() => setTab('admin')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition ${tab==='admin'?'bg-purple-600 text-white':'text-gray-400 hover:text-white'}`}>Admin</button>
+          <button onClick={() => setTab('merchant')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition ${tab==='merchant'?'bg-purple-600 text-white':'text-gray-400 hover:text-white'}`}>I&apos;m a Merchant</button>
+          <button onClick={() => setTab('customer')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition ${tab==='customer'?'bg-yellow-500 text-black':'text-gray-400 hover:text-white'}`}>I&apos;m a Customer</button>
         </div>
 
         {tab === 'merchant' && (
@@ -41,13 +42,15 @@ export default function Home() {
           </div>
         )}
 
-        {tab === 'admin' && (
+        {tab === 'customer' && (
           <div className="space-y-4">
+            <p className="text-sm text-gray-400">Enter the name of the store you shop at to view your points.</p>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Admin password</label>
-              <input type="password" value={adminPw} onChange={e => setAdminPw(e.target.value)} onKeyDown={e => e.key==='Enter' && adminLogin()} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500" />
+              <label className="block text-sm text-gray-400 mb-1">Store domain</label>
+              <input value={customerShop} onChange={e => setCustomerShop(e.target.value)} placeholder="yourstore.myshopify.com" onKeyDown={e => e.key === 'Enter' && goToPortal()} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-yellow-500" />
             </div>
-            <button onClick={adminLogin} className="w-full bg-gradient-to-r from-yellow-600 to-yellow-400 py-3 rounded-xl font-semibold text-sm text-black hover:opacity-90 transition">Sign In as Admin</button>
+            <button onClick={goToPortal} className="w-full bg-gradient-to-r from-yellow-600 to-yellow-400 py-3 rounded-xl font-semibold text-sm text-black hover:opacity-90 transition">View My Points →</button>
+            <p className="text-xs text-gray-600 text-center">Not registered yet? Visit the store and sign up through the rewards widget.</p>
           </div>
         )}
       </div>
