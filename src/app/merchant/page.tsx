@@ -1,12 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; widget_primary_color: string; widget_title: string; points_per_dollar: number; signup_bonus: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; widget_primary_color: string; widget_title: string; widget_position: string; points_per_dollar: number; signup_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 
-export default function MerchantDashboard() {
+function MerchantDashboardInner() {
   const params = useSearchParams()
   const router = useRouter()
   const shop = params.get('shop') || ''
@@ -198,5 +197,13 @@ export default function MerchantDashboard() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function MerchantDashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>}>
+      <MerchantDashboardInner />
+    </Suspense>
   )
 }
