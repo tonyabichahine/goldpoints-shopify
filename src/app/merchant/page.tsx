@@ -58,7 +58,7 @@ function MerchantDashboardInner() {
     setOffers(prev => prev.filter(o => o.id !== id))
   }
 
-  const widgetSnippet = `<script src="${process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'}/widget.js" data-shop="${shop}"></script>`
+  const widgetSnippet = `{% if customer %}\n<script src="${process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'}/widget.js"\n  data-shop="{{ shop.permanent_domain }}"\n  data-customer-email="{{ customer.email }}"\n  data-customer-name="{{ customer.first_name }} {{ customer.last_name }}"></script>\n{% else %}\n<script src="${process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'}/widget.js"\n  data-shop="{{ shop.permanent_domain }}"></script>\n{% endif %}`
 
   if (!shop) return <div className="p-10 text-center text-gray-400">No store specified. <a href="/" className="underline">Go back</a></div>
   if (!merchant) return <div className="p-10 text-center text-gray-400">Loading...</div>

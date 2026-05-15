@@ -4,20 +4,23 @@
   const SHOP = script ? script.getAttribute('data-shop') : ''
   if (!SHOP) return
 
+  // Shopify passes logged-in customer data via Liquid in the script tag
+  const CUSTOMER_EMAIL = (script && script.getAttribute('data-customer-email')) || ''
+  const CUSTOMER_NAME = (script && script.getAttribute('data-customer-name')) || ''
+
   let config = null
   let customer = null
   let open = false
-  let view = 'loading' // loading | register | home | redeeming
+  let view = 'loading'
 
   const STORAGE_KEY = `gp_email_${SHOP}`
-  const savedEmail = localStorage.getItem(STORAGE_KEY) || ''
 
   // ── Styles ──────────────────────────────────────────────────────────
   const style = document.createElement('style')
   style.textContent = `
     #gp-btn { position:fixed; bottom:24px; right:24px; width:56px; height:56px; border-radius:50%; border:none; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:99998; font-size:24px; transition:transform .2s; }
     #gp-btn:hover { transform:scale(1.1); }
-    #gp-panel { position:fixed; bottom:90px; right:24px; width:340px; max-height:520px; background:#16162a; border:1px solid rgba(255,255,255,.1); border-radius:20px; overflow:hidden; display:none; flex-direction:column; z-index:99999; box-shadow:0 8px 40px rgba(0,0,0,.6); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#e0e0f0; }
+    #gp-panel { position:fixed; bottom:90px; right:24px; width:340px; max-height:540px; background:#16162a; border:1px solid rgba(255,255,255,.1); border-radius:20px; overflow:hidden; display:none; flex-direction:column; z-index:99999; box-shadow:0 8px 40px rgba(0,0,0,.6); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#e0e0f0; }
     #gp-panel.open { display:flex; }
     .gp-header { padding:16px 20px; display:flex; align-items:center; justify-content:space-between; }
     .gp-title { font-weight:700; font-size:1rem; }
@@ -25,8 +28,11 @@
     .gp-body { padding:0 20px 20px; overflow-y:auto; flex:1; }
     .gp-input { width:100%; background:#0f0f1a; border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:10px 12px; color:#e0e0f0; font-size:.9rem; outline:none; box-sizing:border-box; margin-bottom:10px; }
     .gp-input:focus { border-color:#6c3fff; }
+    .gp-input:disabled { opacity:.5; cursor:not-allowed; }
     .gp-btn-main { width:100%; padding:11px; border:none; border-radius:10px; font-size:.9rem; font-weight:700; cursor:pointer; transition:opacity .2s; }
     .gp-btn-main:hover { opacity:.88; }
+    .gp-btn-outline { width:100%; padding:11px; border-radius:10px; font-size:.9rem; font-weight:700; cursor:pointer; transition:opacity .2s; background:transparent; }
+    .gp-btn-outline:hover { opacity:.88; }
     .gp-points { text-align:center; padding:16px 0 8px; }
     .gp-pts-num { font-size:2.4rem; font-weight:800; }
     .gp-pts-lbl { font-size:.8rem; color:#7878a0; }
@@ -46,6 +52,10 @@
     .gp-section-title { font-size:.78rem; color:#7878a0; text-transform:uppercase; letter-spacing:.5px; margin:14px 0 8px; }
     .gp-progress { background:#0f0f1a; border-radius:10px; height:6px; margin:8px 0; overflow:hidden; }
     .gp-progress-fill { height:100%; border-radius:10px; background:linear-gradient(90deg,#6c3fff,#ffd700); transition:width .6s; }
+    .gp-auth-btns { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px; }
+    .gp-consent { display:flex; align-items:flex-start; gap:10px; font-size:.82rem; color:#aaa; margin:4px 0 16px; cursor:pointer; line-height:1.4; }
+    .gp-consent input[type=checkbox] { width:16px; height:16px; margin-top:1px; flex-shrink:0; cursor:pointer; accent-color:#6c3fff; }
+    .gp-field-label { font-size:.78rem; color:#7878a0; display:block; margin-bottom:4px; }
   `
   document.head.appendChild(style)
 
@@ -68,16 +78,37 @@
     return r.json()
   }
 
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  }
+
   async function loadConfig() {
     render('loading')
     config = await api(`/api/widget/config?shop=${SHOP}`)
     if (config.error) { render('error'); return }
     btn.style.background = config.widget_primary_color || '#6c3fff'
     if (config.widget_position === 'bottom-left') { btn.style.right = 'auto'; btn.style.left = '24px'; panel.style.right = 'auto'; panel.style.left = '24px' }
-    if (savedEmail) {
-      const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(savedEmail)}`)
-      if (data.found) { customer = data.customer; render('home') } else render('register')
-    } else render('register')
+
+    if (CUSTOMER_EMAIL) {
+      // Shopify logged-in customer — check their GoldPoints account
+      const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(CUSTOMER_EMAIL)}`)
+      if (data.found && data.customer.birthday) {
+        customer = data.customer
+        localStorage.setItem(STORAGE_KEY, CUSTOMER_EMAIL)
+        render('home')
+      } else {
+        render('profile')
+      }
+    } else {
+      // Not logged into Shopify — check localStorage fallback
+      const savedEmail = localStorage.getItem(STORAGE_KEY) || ''
+      if (savedEmail) {
+        const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(savedEmail)}`)
+        if (data.found) { customer = data.customer; render('home') } else render('welcome')
+      } else {
+        render('welcome')
+      }
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -115,17 +146,38 @@
     if (v === 'loading') return '<p class="gp-msg" style="padding:30px 0">Loading...</p>'
     if (v === 'error') return '<p class="gp-msg" style="padding:30px 0;color:#e74c3c">Could not load rewards. Try again later.</p>'
 
-    if (v === 'register') {
+    if (v === 'welcome') {
       return `
-        <p class="gp-msg" style="margin-bottom:12px;padding-top:8px">Join our loyalty program and earn points on every purchase!</p>
-        <input class="gp-input" id="gp-name" placeholder="Your name" />
-        <input class="gp-input" id="gp-email" placeholder="Email address" type="email" />
-        <input class="gp-input" id="gp-password" placeholder="Create a password" type="password" />
-        <input class="gp-input" id="gp-phone" placeholder="Phone (optional)" type="tel" />
-        <input class="gp-input" id="gp-birthday" placeholder="Birthday (optional)" type="date" />
-        <button class="gp-btn-main" id="gp-register-btn" style="background:${color}">Join & Earn ${config.signup_bonus || 0} Points</button>
-        <p id="gp-reg-msg" class="gp-msg"></p>
-        <p class="gp-msg">Already a member? <button style="background:none;border:none;color:#c47aff;cursor:pointer;text-decoration:underline;font-size:.8rem" id="gp-login-btn">Look up my points</button></p>
+        <div style="padding-top:12px">
+          <p style="font-weight:700;font-size:1rem;margin-bottom:4px">Welcome to our Loyalty Program</p>
+          <p class="gp-msg" style="text-align:left;padding:0 0 16px">Earn points on every purchase and redeem them for exclusive rewards.</p>
+          <div class="gp-auth-btns">
+            <button class="gp-btn-main" id="gp-shopify-register" style="background:${color}">Register</button>
+            <button class="gp-btn-outline" id="gp-shopify-login" style="border:2px solid ${color};color:${color}">Login</button>
+          </div>
+          <p class="gp-msg" style="margin-top:12px">Already logged in? <button style="background:none;border:none;color:#c47aff;cursor:pointer;text-decoration:underline;font-size:.8rem" id="gp-lookup-link">Look up my points</button></p>
+        </div>
+      `
+    }
+
+    if (v === 'profile') {
+      return `
+        <div style="padding-top:12px">
+          <p style="font-weight:700;font-size:1rem;margin-bottom:4px">Complete your profile</p>
+          <p class="gp-msg" style="text-align:left;padding:0 0 14px">Just a couple more details to start earning points!</p>
+          <label class="gp-field-label">Name</label>
+          <input class="gp-input" id="gp-profile-name" value="${esc(CUSTOMER_NAME)}" placeholder="Your name" ${CUSTOMER_NAME ? 'disabled' : ''} />
+          <label class="gp-field-label">Email</label>
+          <input class="gp-input" id="gp-profile-email" value="${esc(CUSTOMER_EMAIL)}" type="email" disabled />
+          <label class="gp-field-label">Date of birth</label>
+          <input class="gp-input" id="gp-profile-birthday" type="date" />
+          <label class="gp-consent">
+            <input type="checkbox" id="gp-marketing-consent" />
+            I would like to receive promotions by email
+          </label>
+          <button class="gp-btn-main" id="gp-profile-save" style="background:${color}">Save & Start Earning</button>
+          <p id="gp-profile-msg" class="gp-msg"></p>
+        </div>
       `
     }
 
@@ -159,30 +211,41 @@
         <div class="gp-section-title">Available Rewards</div>
         ${offers || '<p class="gp-msg">No offers yet — check back soon!</p>'}
         <div id="gp-code-area"></div>
-        <button class="gp-logout" id="gp-logout-btn">Not ${customer.name}? Sign out</button>
+        <button class="gp-logout" id="gp-logout-btn">Not ${esc(customer.name)}? Sign out</button>
       `
     }
     return ''
   }
 
   function bindEvents(v, color) {
-    if (v === 'register') {
-      document.getElementById('gp-register-btn').addEventListener('click', async () => {
-        const name = document.getElementById('gp-name').value.trim()
-        const email = document.getElementById('gp-email').value.trim()
-        const password = document.getElementById('gp-password').value
-        const phone = document.getElementById('gp-phone').value.trim()
-        const birthday = document.getElementById('gp-birthday').value
-        const msg = document.getElementById('gp-reg-msg')
-        if (!name || !email || !password) { msg.textContent = 'Name, email, and password are required.'; msg.style.color = '#e74c3c'; return }
-        msg.textContent = 'Registering...'; msg.style.color = '#7878a0'
-        const data = await api('/api/widget/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop: SHOP, email, name, password, phone, birthday }) })
+    if (v === 'welcome') {
+      document.getElementById('gp-shopify-register').addEventListener('click', () => {
+        window.location.href = '/account/register'
+      })
+      document.getElementById('gp-shopify-login').addEventListener('click', () => {
+        window.location.href = '/account/login'
+      })
+      document.getElementById('gp-lookup-link').addEventListener('click', () => render('lookup'))
+    }
+
+    if (v === 'profile') {
+      document.getElementById('gp-profile-save').addEventListener('click', async () => {
+        const nameEl = document.getElementById('gp-profile-name')
+        const name = CUSTOMER_NAME || nameEl.value.trim()
+        const birthday = document.getElementById('gp-profile-birthday').value
+        const marketing_consent = document.getElementById('gp-marketing-consent').checked
+        const msg = document.getElementById('gp-profile-msg')
+        msg.textContent = 'Saving...'; msg.style.color = '#7878a0'
+        const data = await api('/api/widget/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shop: SHOP, email: CUSTOMER_EMAIL, name, birthday, marketing_consent })
+        })
         if (data.error) { msg.textContent = data.error; msg.style.color = '#e74c3c'; return }
-        localStorage.setItem(STORAGE_KEY, email)
+        localStorage.setItem(STORAGE_KEY, CUSTOMER_EMAIL)
         customer = data.customer
         render('home')
       })
-      document.getElementById('gp-login-btn').addEventListener('click', () => render('lookup'))
     }
 
     if (v === 'lookup') {
@@ -192,7 +255,7 @@
         if (!email) return
         msg.textContent = 'Looking up...'; msg.style.color = '#7878a0'
         const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(email)}`)
-        if (!data.found) { msg.textContent = 'Email not found. Register below.'; msg.style.color = '#e74c3c'; setTimeout(() => render('register'), 1500); return }
+        if (!data.found) { msg.textContent = 'Email not found. Register first.'; msg.style.color = '#e74c3c'; return }
         localStorage.setItem(STORAGE_KEY, email)
         customer = data.customer
         render('home')
@@ -203,7 +266,7 @@
       document.querySelectorAll('.gp-redeem-btn:not([disabled])').forEach(btn => {
         btn.addEventListener('click', async () => {
           const offerId = btn.getAttribute('data-offer-id')
-          const email = localStorage.getItem(STORAGE_KEY)
+          const email = customer.email || localStorage.getItem(STORAGE_KEY)
           btn.disabled = true; btn.textContent = 'Processing...'
           const data = await api('/api/widget/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop: SHOP, email, offerId }) })
           const area = document.getElementById('gp-code-area')
@@ -213,7 +276,11 @@
           document.querySelector('.gp-pts-num').textContent = data.newPoints.toLocaleString()
         })
       })
-      document.getElementById('gp-logout-btn').addEventListener('click', () => { localStorage.removeItem(STORAGE_KEY); customer = null; render('register') })
+      document.getElementById('gp-logout-btn').addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY)
+        customer = null
+        render('welcome')
+      })
     }
   }
 })()
