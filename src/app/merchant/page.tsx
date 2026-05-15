@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; widget_primary_color: string; widget_title: string; widget_position: string; points_per_dollar: number; signup_bonus: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; widget_primary_color: string; widget_title: string; widget_position: string; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 
 function MerchantDashboardInner() {
@@ -158,6 +158,11 @@ function MerchantDashboardInner() {
               </div>
               <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+              <div className="border-t border-white/10 pt-4">
+                <p className="text-xs text-gray-500 mb-3">Social Follow Reward — shown as slide 2 in the widget. Leave blank to hide it.</p>
+                <div><label className="block text-sm text-gray-400 mb-1">Social page URL (Facebook, Instagram, etc.)</label><input value={merchant.social_follow_url || ''} onChange={e => setMerchant(p => p ? {...p, social_follow_url: e.target.value} : p)} placeholder="https://facebook.com/yourstore" className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
+                <div className="mt-3"><label className="block text-sm text-gray-400 mb-1">Points awarded for following</label><input type="number" value={merchant.follow_points || 50} onChange={e => setMerchant(p => p ? {...p, follow_points: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+              </div>
               <button onClick={saveSettings} disabled={saving} className="bg-gradient-to-r from-purple-700 to-purple-500 px-6 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">{saving ? 'Saving...' : 'Save Settings'}</button>
             </div>
           </div>
