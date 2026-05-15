@@ -6,7 +6,10 @@
 
   const CUSTOMER_EMAIL = (script && script.getAttribute('data-customer-email')) || ''
   const CUSTOMER_NAME  = (script && script.getAttribute('data-customer-name'))  || ''
-  const GP_REF = new URLSearchParams(window.location.search).get('gp_ref') || ''
+  const REF_STORAGE_KEY = `gp_ref_${SHOP}`
+  const urlRef = new URLSearchParams(window.location.search).get('gp_ref') || ''
+  if (urlRef) localStorage.setItem(REF_STORAGE_KEY, urlRef)
+  const GP_REF = urlRef || localStorage.getItem(REF_STORAGE_KEY) || ''
 
   let config        = null
   let customer      = null
@@ -130,7 +133,7 @@
 
     if (CUSTOMER_EMAIL) {
       const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(CUSTOMER_EMAIL)}`)
-      if (data.found && data.customer.birthday) { customer=data.customer; localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); render('home') }
+      if (data.found) { customer=data.customer; localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); render('home') }
       else render('profile')
     } else {
       const saved = localStorage.getItem(STORAGE_KEY) || ''
@@ -255,9 +258,9 @@
         <input class="gp-input" id="gp-profile-name" value="${esc(CUSTOMER_NAME)}" placeholder="Your name" ${CUSTOMER_NAME?'disabled':''} />
         <label class="gp-field-label">Email</label>
         <input class="gp-input" value="${esc(CUSTOMER_EMAIL)}" type="email" disabled />
-        <label class="gp-field-label">Date of birth</label>
+        <label class="gp-field-label">Date of birth <span style="opacity:.5;font-size:.72rem">(optional)</span></label>
         <input class="gp-input" id="gp-profile-birthday" type="date" />
-        <label class="gp-consent"><input type="checkbox" id="gp-marketing-consent" /> I would like to receive promotions by email</label>
+        <label class="gp-consent"><input type="checkbox" id="gp-marketing-consent" /> I would like to receive promotions by email <span style="opacity:.5">(optional)</span></label>
         <button class="gp-btn-main" id="gp-profile-save" style="background:${c}">Save & Start Earning</button>
         <p id="gp-profile-msg" class="gp-msg"></p>
       </div>
@@ -420,7 +423,7 @@
         msg.textContent='Saving...'; msg.style.color='#7878a0'
         const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email:CUSTOMER_EMAIL,name,birthday,marketing_consent,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
-        localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); customer=data.customer; render('home')
+        localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); localStorage.removeItem(REF_STORAGE_KEY); customer=data.customer; render('home')
       })
     }
 
