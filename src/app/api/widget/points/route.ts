@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const { data: customer } = await supabaseAdmin
-    .from('customers').select('id, name, email, points, tier, birthday').eq('merchant_id', merchant.id).eq('email', email).single()
+    .from('customers').select('id, name, email, points, tier, birthday, referral_code').eq('merchant_id', merchant.id).eq('email', email).single()
   if (!customer) return NextResponse.json({ found: false }, { headers: cors })
 
   return NextResponse.json({ found: true, customer }, { headers: cors })
