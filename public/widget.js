@@ -19,8 +19,8 @@
   // ── Styles ────────────────────────────────────────────────────────────
   const style = document.createElement('style')
   style.textContent = `
-    #gp-btn{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:99998;font-size:24px;transition:transform .2s}
-    #gp-btn:hover{transform:scale(1.1)}
+    #gp-btn{position:fixed;bottom:24px;right:24px;height:48px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:8px;z-index:99998;font-size:.9rem;font-weight:700;color:#fff;transition:transform .2s,opacity .2s;white-space:nowrap}
+    #gp-btn:hover{transform:translateY(-2px);opacity:.92}
     #gp-panel{position:fixed;bottom:90px;right:24px;width:340px;max-height:560px;background:#16162a;border:1px solid rgba(255,255,255,.1);border-radius:20px;overflow:hidden;display:none;flex-direction:column;z-index:99999;box-shadow:0 8px 40px rgba(0,0,0,.6);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e0e0f0}
     #gp-panel.open{display:flex}
     .gp-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -78,7 +78,8 @@
 
   // ── Button & Panel ────────────────────────────────────────────────────
   const btn = document.createElement('button')
-  btn.id = 'gp-btn'; btn.innerHTML = '⭐'; btn.setAttribute('aria-label','Loyalty rewards')
+  btn.id = 'gp-btn'; btn.setAttribute('aria-label','Loyalty rewards')
+  btn.innerHTML = '<span style="font-size:18px">🎁</span><span id="gp-btn-label">Rewards</span>'
   document.body.appendChild(btn)
   const panel = document.createElement('div')
   panel.id = 'gp-panel'; document.body.appendChild(panel)
@@ -96,7 +97,10 @@
     render('loading')
     config = await api(`/api/widget/config?shop=${SHOP}`)
     if (config.error) { render('error'); return }
-    btn.style.background = config.widget_primary_color || '#6c3fff'
+    const color = config.widget_primary_color || '#6c3fff'
+    btn.style.background = color
+    const label = document.getElementById('gp-btn-label')
+    if (label) label.textContent = config.widget_title || 'Rewards'
     if (config.widget_position === 'bottom-left') { btn.style.right='auto'; btn.style.left='24px'; panel.style.right='auto'; panel.style.left='24px' }
 
     if (CUSTOMER_EMAIL) {
