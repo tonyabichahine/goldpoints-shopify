@@ -1,5 +1,5 @@
 (function () {
-  const BASE = 'https://goldpoints.vercel.app'
+  const BASE = 'https://goldpoints-shopify.vercel.app'
   const script = document.currentScript || document.querySelector('script[data-shop]')
   const SHOP = script ? script.getAttribute('data-shop') : ''
   if (!SHOP) return

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const APP_URL = 'https://goldpoints.vercel.app'
+const APP_URL = 'https://goldpoints-shopify.vercel.app'
 
 interface Merchant {
   id: string

@@ -16,7 +16,7 @@ Opens at http://localhost:3000
 1. Edit code locally
 2. `git add . && git commit -m "your message"`
 3. `git push`
-4. Vercel auto-deploys in ~60 seconds → live at https://goldpoints.vercel.app
+4. Vercel auto-deploys in ~60 seconds → live at https://goldpoints-shopify.vercel.app
 
 ## Tech stack
 | Layer | Tech |
@@ -37,7 +37,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbG...          ← server-side DB access
 SHOPIFY_API_KEY=2236f7c85e070634127c0bbe6fdadbaa
 SHOPIFY_API_SECRET=shpss_b86bc8d8...
 SHOPIFY_SCOPES=read_orders,read_customers,write_discounts
-NEXT_PUBLIC_APP_URL=https://goldpoints.vercel.app
+NEXT_PUBLIC_APP_URL=https://goldpoints-shopify.vercel.app
 ADMIN_PASSWORD=admin123
 ```
 On Vercel these are set as Environment Variables in the project dashboard.
@@ -107,13 +107,13 @@ Password: `admin123` (set in `ADMIN_PASSWORD` env var). Admin page at `/admin` �
 ## Widget (public/widget.js)
 Self-contained IIFE. No dependencies. Reads `data-shop` from the script tag, calls the widget API routes, renders a floating panel. Stores customer email in `localStorage` so customers stay logged in across visits. Install snippet:
 ```html
-<script src="https://goldpoints.vercel.app/widget.js" data-shop="store.myshopify.com"></script>
+<script src="https://goldpoints-shopify.vercel.app/widget.js" data-shop="store.myshopify.com"></script>
 ```
 
 ## Webhook setup (merchant must do this once)
 In Shopify Admin → Settings → Notifications → Webhooks:
 - Event: Order creation
-- URL: `https://goldpoints.vercel.app/api/webhooks/orders`
+- URL: `https://goldpoints-shopify.vercel.app/api/webhooks/orders`
 - Format: JSON
 
 ## What is NOT yet built (future work)

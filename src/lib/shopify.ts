@@ -1,7 +1,7 @@
 export const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY!
 export const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET!
 export const SCOPES = process.env.SHOPIFY_SCOPES || 'read_orders,read_customers,write_discounts'
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints.vercel.app'
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'
 
 export function getInstallUrl(shop: string, state: string) {
   const redirectUri = `${APP_URL}/api/auth/callback`

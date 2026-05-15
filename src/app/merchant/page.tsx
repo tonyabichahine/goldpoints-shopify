@@ -58,7 +58,7 @@ function MerchantDashboardInner() {
     setOffers(prev => prev.filter(o => o.id !== id))
   }
 
-  const widgetSnippet = `<script src="${process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints.vercel.app'}/widget.js" data-shop="${shop}"></script>`
+  const widgetSnippet = `<script src="${process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'}/widget.js" data-shop="${shop}"></script>`
 
   if (!shop) return <div className="p-10 text-center text-gray-400">No store specified. <a href="/" className="underline">Go back</a></div>
   if (!merchant) return <div className="p-10 text-center text-gray-400">Loading...</div>
@@ -188,7 +188,7 @@ function MerchantDashboardInner() {
                   <li>In Shopify Admin, go to <strong>Settings → Notifications → Webhooks</strong></li>
                   <li>Click <strong>Create webhook</strong></li>
                   <li>Event: <strong>Order creation</strong>, Format: <strong>JSON</strong></li>
-                  <li>URL: <code className="text-purple-400 break-all">{process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints.vercel.app'}/api/webhooks/orders</code></li>
+                  <li>URL: <code className="text-purple-400 break-all">{process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'}/api/webhooks/orders</code></li>
                   <li>Save — customers will now earn points automatically on every order</li>
                 </ol>
               </div>
