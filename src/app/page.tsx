@@ -14,12 +14,9 @@ export default function Home() {
     window.location.href = `/api/auth/install?shop=${domain}`
   }
 
-  function adminLogin() {
-    if (adminPw === 'admin123') {
-      router.push('/admin')
-    } else {
-      alert('Wrong password')
-    }
+  async function adminLogin() {
+    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPw }) })
+    if (r.ok) { router.push('/admin') } else { alert('Wrong password') }
   }
 
   return (
