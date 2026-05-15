@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+const APP_URL = 'https://goldpoints.vercel.app'
+
 interface Merchant {
   id: string
   store_name: string
@@ -28,6 +30,10 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newM, setNewM] = useState({ shopify_domain: '', store_name: '', email: '' })
+  const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -41,6 +47,17 @@ export default function AdminPage() {
 
   async function toggleMerchant(id: string, active: boolean) {
     await fetch('/api/admin/merchants', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, active: !active }) })
+    load()
+  }
+
+  async function addMerchant() {
+    if (!newM.shopify_domain || !newM.store_name) { setAddError('Domain and store name are required.'); return }
+    setAdding(true); setAddError('')
+    const r = await fetch('/api/admin/merchants/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newM) })
+    const d = await r.json()
+    if (!r.ok) { setAddError(d.error); setAdding(false); return }
+    setNewM({ shopify_domain: '', store_name: '', email: '' })
+    setShowAdd(false); setAdding(false)
     load()
   }
 
@@ -81,8 +98,39 @@ export default function AdminPage() {
           ))}
         </div>
 
+        {/* Add Merchant */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-yellow-400">All Merchants</h2>
+          <button onClick={() => setShowAdd(p => !p)} className="bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold px-4 py-2 rounded-lg transition">
+            {showAdd ? 'Cancel' : '+ Add Merchant'}
+          </button>
+        </div>
+
+        {showAdd && (
+          <div className="bg-[#16162a] border border-yellow-500/30 rounded-xl p-5 mb-5">
+            <h3 className="font-semibold mb-4 text-sm">Add merchant manually (non-Shopify or pre-onboarding)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Store / Business Name *</label>
+                <input value={newM.store_name} onChange={e => setNewM(p => ({...p, store_name: e.target.value}))} placeholder="e.g. Bella Boutique" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Shopify Domain *</label>
+                <input value={newM.shopify_domain} onChange={e => setNewM(p => ({...p, shopify_domain: e.target.value}))} placeholder="mystore.myshopify.com" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Email (optional)</label>
+                <input value={newM.email} onChange={e => setNewM(p => ({...p, email: e.target.value}))} placeholder="owner@store.com" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
+              </div>
+            </div>
+            {addError && <p className="text-red-400 text-xs mt-2">{addError}</p>}
+            <button onClick={addMerchant} disabled={adding} className="mt-3 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black text-sm font-bold px-5 py-2 rounded-lg transition">
+              {adding ? 'Adding...' : 'Create Merchant Account'}
+            </button>
+          </div>
+        )}
+
         {/* Merchants table */}
-        <h2 className="text-lg font-bold text-yellow-400 mb-4">All Merchants</h2>
         {data.merchants.length === 0 ? (
           <div className="bg-[#16162a] border border-white/10 rounded-xl p-10 text-center text-gray-500">
             No merchants yet. They connect by visiting the homepage and entering their Shopify store.
@@ -92,7 +140,7 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-[#1f1f3a]">
                 <tr>
-                  {['Store', 'Domain', 'Members', 'Points', 'pts/$', 'Signup bonus', 'Joined', 'Status', 'Actions'].map(h => (
+                  {['Store', 'Domain', 'Members', 'Points', 'pts/$', 'Signup bonus', 'Joined', 'Status', 'Portal', 'Actions'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -111,6 +159,9 @@ export default function AdminPage() {
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${m.active ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
                         {m.active ? 'Active' : 'Paused'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <a href={`${APP_URL}/portal/${encodeURIComponent(m.shopify_domain)}`} target="_blank" className="text-xs text-purple-400 hover:underline">View →</a>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
