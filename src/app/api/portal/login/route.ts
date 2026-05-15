@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
-  const { shop, email, birthday } = await req.json()
-  if (!shop || !email || !birthday) return NextResponse.json({ error: 'Email and birthday are required.' }, { status: 400 })
+  const { shop, email, password } = await req.json()
+  if (!shop || !email || !password) return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants').select('id').eq('shopify_domain', shop).single()
@@ -17,9 +18,9 @@ export async function POST(req: NextRequest) {
 
   if (!customer) return NextResponse.json({ error: 'No account found with that email.' }, { status: 404 })
 
-  // Verify birthday matches
-  if (!customer.birthday) return NextResponse.json({ error: 'No birthday on file. Please use the store widget to update your profile.' }, { status: 401 })
-  if (customer.birthday !== birthday) return NextResponse.json({ error: 'Birthday does not match our records.' }, { status: 401 })
+  if (!customer.password_hash) return NextResponse.json({ error: 'No password on file. Please re-register through the store widget.' }, { status: 401 })
+  const valid = await bcrypt.compare(password, customer.password_hash)
+  if (!valid) return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 })
 
   const { data: history } = await supabaseAdmin
     .from('point_transactions')

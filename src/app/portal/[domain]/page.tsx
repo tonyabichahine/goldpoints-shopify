@@ -15,7 +15,7 @@ export default function CustomerPortal() {
   const [notFound, setNotFound] = useState(false)
   const [view, setView] = useState<'login' | 'dashboard'>('login')
   const [email, setEmail] = useState('')
-  const [birthday, setBirthday] = useState('')
+  const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
   const [customer, setCustomer] = useState<Customer | null>(null)
@@ -34,9 +34,9 @@ export default function CustomerPortal() {
   }, [shop])
 
   async function handleLogin() {
-    if (!email || !birthday) { setLoginError('Please enter your email and birthday.'); return }
+    if (!email || !password) { setLoginError('Please enter your email and password.'); return }
     setLoggingIn(true); setLoginError('')
-    const r = await fetch('/api/portal/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop, email, birthday }) })
+    const r = await fetch('/api/portal/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop, email, password }) })
     const data = await r.json()
     if (!r.ok) { setLoginError(data.error || 'Not found. Make sure you registered through the store.'); setLoggingIn(false); return }
     setCustomer(data.customer)
@@ -115,8 +115,8 @@ export default function CustomerPortal() {
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" className="w-full bg-[#16162a] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-purple-500 transition" />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Birthday</label>
-                <input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="w-full bg-[#16162a] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-purple-500 transition" />
+                <label className="block text-xs text-gray-400 mb-1">Password</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" className="w-full bg-[#16162a] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-purple-500 transition" />
               </div>
               {loginError && <p className="text-red-400 text-xs">{loginError}</p>}
               <button onClick={handleLogin} disabled={loggingIn} style={{ background: color }} className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-50 transition hover:opacity-90">
@@ -196,7 +196,7 @@ export default function CustomerPortal() {
               </div>
             </div>
 
-            <button onClick={() => { setView('login'); setCustomer(null); setRedeemMsg(null) }} className="w-full text-xs text-gray-600 hover:text-gray-400 py-2 transition">Sign out</button>
+            <button onClick={() => { setView('login'); setCustomer(null); setRedeemMsg(null); setPassword('') }} className="w-full text-xs text-gray-600 hover:text-gray-400 py-2 transition">Sign out</button>
           </div>
         )}
       </main>

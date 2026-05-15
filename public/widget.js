@@ -120,6 +120,7 @@
         <p class="gp-msg" style="margin-bottom:12px;padding-top:8px">Join our loyalty program and earn points on every purchase!</p>
         <input class="gp-input" id="gp-name" placeholder="Your name" />
         <input class="gp-input" id="gp-email" placeholder="Email address" type="email" />
+        <input class="gp-input" id="gp-password" placeholder="Create a password" type="password" />
         <input class="gp-input" id="gp-phone" placeholder="Phone (optional)" type="tel" />
         <input class="gp-input" id="gp-birthday" placeholder="Birthday (optional)" type="date" />
         <button class="gp-btn-main" id="gp-register-btn" style="background:${color}">Join & Earn ${config.signup_bonus || 0} Points</button>
@@ -169,12 +170,13 @@
       document.getElementById('gp-register-btn').addEventListener('click', async () => {
         const name = document.getElementById('gp-name').value.trim()
         const email = document.getElementById('gp-email').value.trim()
+        const password = document.getElementById('gp-password').value
         const phone = document.getElementById('gp-phone').value.trim()
         const birthday = document.getElementById('gp-birthday').value
         const msg = document.getElementById('gp-reg-msg')
-        if (!name || !email) { msg.textContent = 'Name and email are required.'; msg.style.color = '#e74c3c'; return }
+        if (!name || !email || !password) { msg.textContent = 'Name, email, and password are required.'; msg.style.color = '#e74c3c'; return }
         msg.textContent = 'Registering...'; msg.style.color = '#7878a0'
-        const data = await api('/api/widget/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop: SHOP, email, name, phone, birthday }) })
+        const data = await api('/api/widget/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop: SHOP, email, name, password, phone, birthday }) })
         if (data.error) { msg.textContent = data.error; msg.style.color = '#e74c3c'; return }
         localStorage.setItem(STORAGE_KEY, email)
         customer = data.customer

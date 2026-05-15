@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import bcrypt from 'bcryptjs'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -8,8 +9,8 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  const { shop, email, name, phone, birthday } = await req.json()
-  if (!shop || !email || !name) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
+  const { shop, email, name, phone, birthday, password } = await req.json()
+  if (!shop || !email || !name || !password) return NextResponse.json({ error: 'Name, email, and password are required.' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants').select('id, signup_bonus').eq('shopify_domain', shop).single()
@@ -23,9 +24,10 @@ export async function POST(req: NextRequest) {
   }
 
   const bonus = merchant.signup_bonus || 0
+  const password_hash = await bcrypt.hash(password, 10)
   const { data: customer, error } = await supabaseAdmin
     .from('customers')
-    .insert({ merchant_id: merchant.id, email, name, phone: phone || null, birthday: birthday || null, points: bonus, tier: 'Bronze' })
+    .insert({ merchant_id: merchant.id, email, name, phone: phone || null, birthday: birthday || null, password_hash, points: bonus, tier: 'Bronze' })
     .select().single()
 
   if (error) return NextResponse.json({ error: 'Registration failed' }, { status: 500, headers: cors })
