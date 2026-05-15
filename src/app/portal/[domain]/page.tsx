@@ -30,6 +30,16 @@ export default function CustomerPortal() {
         if (d.error) { setNotFound(true); return }
         setMerchant({ store_name: d.store_name, widget_primary_color: d.widget_primary_color, widget_title: d.widget_title })
         setOffers(d.offers || [])
+        const session = sessionStorage.getItem(`gp_session_${shop}`)
+        if (session) {
+          try {
+            const { customer, history } = JSON.parse(session)
+            setCustomer(customer)
+            setHistory(history || [])
+            setView('dashboard')
+            sessionStorage.removeItem(`gp_session_${shop}`)
+          } catch {}
+        }
       })
   }, [shop])
 
