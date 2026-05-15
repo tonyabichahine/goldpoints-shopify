@@ -12,6 +12,6 @@ export default async function ReferralPage({ params }: { params: Promise<{ code:
 
   if (!customer) redirect('https://goldpoints-shopify.vercel.app')
 
-  const m = customer.merchants as { shopify_domain: string; store_name: string }
+  const m = (Array.isArray(customer.merchants) ? customer.merchants[0] : customer.merchants) as { shopify_domain: string; store_name: string }
   redirect(`https://${m.shopify_domain}?gp_ref=${code}`)
 }
