@@ -31,114 +31,134 @@ Vercel auto-deploys in ~60 seconds after push.
 | Framework | Next.js 16 (App Router, TypeScript, Turbopack) |
 | Styling | Tailwind CSS |
 | Database | Supabase (PostgreSQL) — project: `cybrenydxookzuexluni` |
-| Auth | Shopify OAuth (merchants), bcryptjs passwords (customers), cookie session (admin) |
+| Auth | Email+password (merchants), bcryptjs passwords (customers), cookie session (admin) |
+| Email | Resend — `resend` npm package |
 | Hosting | Vercel — repo: `tonyabichahine/goldpoints-shopify` |
-| Shopify | Partner app — Client ID: `2236f7c85e070634127c0bbe6fdadbaa` |
+| Shopify | Partner app — Client ID: `78c3102f2df130e39ee82789e038e7ae` |
 
 ## Environment variables (.env.local)
 All secrets live in `Desktop\goldpoints-app\.env.local` — **never commit this file**.
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://cybrenydxookzuexluni.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbG...          ← server-side DB access
-SHOPIFY_API_KEY=2236f7c85e070634127c0bbe6fdadbaa
-SHOPIFY_API_SECRET=shpss_b86bc8d8...
-SHOPIFY_SCOPES=read_orders,read_customers,write_discounts
+SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
+SHOPIFY_API_KEY=<from Shopify Partners dashboard>
+SHOPIFY_API_SECRET=<from Shopify Partners dashboard>
+SHOPIFY_SCOPES=read_orders,read_customers,write_customers,write_discounts
 NEXT_PUBLIC_APP_URL=https://goldpoints-shopify.vercel.app
 ADMIN_PASSWORD=admin123
+RESEND_API_KEY=re_BxBWcFy3_FKefdAbreuFri8PCW6o6JNSF
+TEST_EMAIL=tonyabichahine@gmail.com   ← dev only: routes all emails to Tony until domain verified
 ```
-On Vercel these are set as Environment Variables in the project dashboard. NEXT_PUBLIC_APP_URL must be `https://goldpoints-shopify.vercel.app`.
+On Vercel all of these are set as Environment Variables. `TEST_EMAIL` is temporary — remove it once a real domain is verified on Resend.
+
+## Email setup (Resend)
+- Package: `resend` (installed)
+- Currently using `from: onboarding@resend.dev` (Resend's shared test domain)
+- `TEST_EMAIL` env var routes all outbound emails to Tony's Gmail during development
+- **To go live:** verify a custom domain at resend.com/domains, update `from` address to `noreply@yourdomain.com`, remove `TEST_EMAIL` env var
+- Emails sent: welcome email when Tony creates a merchant account in admin
 
 ## Shopify Partner app
 - Dashboard: partners.shopify.com
+- Client ID: `78c3102f2df130e39ee82789e038e7ae`
 - App URL: `https://goldpoints-shopify.vercel.app`
 - Allowed redirect URL: `https://goldpoints-shopify.vercel.app/api/auth/callback`
-- These must match exactly or OAuth will fail with "invalid redirect URI"
+- Scopes: `read_orders,read_customers,write_customers,write_discounts`
 
 ## File map
 ```
 src/
 ├── app/
-│   ├── page.tsx                              # Home — "I'm a Merchant" tab (Shopify OAuth) + "I'm a Customer" tab (email+password login)
-│   ├── admin/page.tsx                        # Admin dashboard — only accessible at /admin directly (not linked from home)
-│   ├── merchant/page.tsx                     # Merchant dashboard (customers, offers, widget settings, install instructions)
-│   ├── portal/[domain]/page.tsx             # Customer portal per merchant — points, history, redeem offers
-│   ├── ref/[code]/page.tsx                  # Referral redirect — looks up customer by referral_code, redirects to their store with ?gp_ref=
+│   ├── page.tsx                              # Home — "I'm a Merchant" (email+password) + "I'm a Customer" (email+password)
+│   ├── admin/page.tsx                        # Admin dashboard — only at /admin directly (not linked)
+│   ├── merchant/page.tsx                     # Merchant dashboard — loads from merchant_session cookie
+│   ├── portal/[domain]/page.tsx             # Customer portal per merchant
+│   ├── ref/[code]/page.tsx                  # Referral redirect → store with ?gp_ref=
 │   ├── api/
 │   │   ├── auth/
-│   │   │   ├── install/route.ts              # Starts Shopify OAuth
-│   │   │   └── callback/route.ts             # OAuth callback → upserts merchant in DB
+│   │   │   ├── install/route.ts              # Starts Shopify OAuth — accepts merchant_id param, embeds in state
+│   │   │   └── callback/route.ts             # OAuth callback — links to existing merchant via state merchant_id
 │   │   ├── webhooks/
 │   │   │   └── orders/route.ts               # Shopify webhook → awards points on purchase (HMAC verified)
 │   │   ├── widget/                           # CORS-enabled (called from any Shopify storefront)
 │   │   │   ├── config/route.ts               # Widget settings + active offers for a shop
-│   │   │   ├── register/route.ts             # Registers customer with bcrypt password (legacy — widget now uses profile route)
-│   │   │   ├── points/route.ts               # Looks up customer points/tier/referral_code by email
-│   │   │   ├── profile/route.ts              # Creates or updates customer profile; handles gp_ref referral crediting
-│   │   │   ├── follow/route.ts               # Awards social follow points once per customer (earn_follow transaction)
-│   │   │   └── redeem/route.ts               # Redeems offer → creates real Shopify discount code
+│   │   │   ├── register/route.ts             # Legacy customer registration with password
+│   │   │   ├── points/route.ts               # Customer points/tier/referral_code lookup by email
+│   │   │   ├── profile/route.ts              # Create/update customer profile; handles gp_ref referral
+│   │   │   ├── follow/route.ts               # Award social follow points once per customer
+│   │   │   └── redeem/route.ts               # Redeem offer → creates real Shopify discount code
 │   │   ├── portal/
-│   │   │   ├── global-login/route.ts         # Home page customer login — finds customer across all stores by email+password
-│   │   │   ├── login/route.ts                # Portal login for a specific store (email + password, bcrypt verified)
-│   │   │   └── history/route.ts              # Transaction history for portal
+│   │   │   ├── global-login/route.ts         # Customer login across all stores (email+password)
+│   │   │   ├── login/route.ts                # Customer login for specific store
+│   │   │   └── history/route.ts              # Customer transaction history
 │   │   ├── admin/
 │   │   │   ├── login/route.ts                # Sets admin_session cookie
-│   │   │   ├── overview/route.ts             # All merchants + platform stats
+│   │   │   ├── overview/route.ts             # Platform stats + all merchants
 │   │   │   └── merchants/
 │   │   │       ├── route.ts                  # PATCH (toggle active) + DELETE merchant
-│   │   │       └── add/route.ts              # Admin manually adds a merchant
+│   │   │       └── add/route.ts              # Creates merchant with bcrypt password + sends welcome email via Resend
 │   │   └── merchant/
-│   │       ├── customers/route.ts            # Lists customers for logged-in merchant
-│   │       ├── offers/route.ts               # CRUD for merchant offers
-│   │       └── settings/route.ts             # Saves widget/points settings
+│   │       ├── login/route.ts                # Merchant email+password login → sets merchant_session cookie
+│   │       ├── me/route.ts                   # GET: merchant data from session | DELETE: logout (clears cookie)
+│   │       ├── change-password/route.ts      # Verifies current password, sets new bcrypt hash
+│   │       ├── customers/route.ts            # Lists customers (uses merchant_session)
+│   │       ├── offers/route.ts               # CRUD offers (uses merchant_session)
+│   │       └── settings/route.ts             # Saves widget/points settings (uses merchant_session)
 ├── lib/
 │   ├── supabase.ts                           # supabase (anon) + supabaseAdmin (service role)
 │   └── shopify.ts                            # OAuth helpers, Shopify API fetch, discount code creator, getTier()
 public/
-└── widget.js                                 # Embeddable IIFE widget — no dependencies, merchants paste 1 script tag
+├── widget.js                                 # Embeddable IIFE widget — no dependencies
+└── logo.png                                  # GoldPoints logo (gold star coin + purple orbit)
+src/app/
+└── icon.png                                  # Same logo — used as browser tab favicon
 supabase/
-└── schema.sql                                # DB schema reference — already applied, do NOT re-run blindly
+└── schema.sql                                # DB schema reference — already applied
 ```
 
 ## Database (Supabase) — all tables are live
 | Table | Key columns |
 |---|---|
-| `merchants` | id, shopify_domain, store_name, email, active, points_per_dollar, signup_bonus, birthday_bonus, widget_primary_color, widget_title, widget_position, social_follow_url, follow_points, referral_points |
+| `merchants` | id, shopify_domain (nullable), store_name, email, password_hash, active, points_per_dollar, signup_bonus, birthday_bonus, widget_primary_color, widget_title, widget_position, social_follow_url, follow_points, referral_points, shopify_access_token |
 | `customers` | id, merchant_id, email, name, phone, birthday, marketing_consent, password_hash, points, tier, referral_code, referred_by |
 | `offers` | id, merchant_id, name, description, points_required, offer_type, offer_value, active |
 | `point_transactions` | id, merchant_id, customer_id, type, points, description, created_at |
 | `redemptions` | id, merchant_id, customer_id, offer_id, discount_code, created_at |
 
-**Trigger:** `on_merchant_created` — auto-creates 3 default offers when a merchant is inserted.
-
-**Columns added via ALTER TABLE (already applied, do not re-run):**
+**Columns added via ALTER TABLE (already applied):**
 - `customers.password_hash TEXT`
 - `customers.marketing_consent BOOLEAN`
 - `customers.referral_code TEXT`
-- `customers.referred_by UUID` (references customers.id)
+- `customers.referred_by UUID`
+- `merchants.password_hash TEXT`
 - `merchants.social_follow_url TEXT`
 - `merchants.follow_points INT`
 - `merchants.referral_points INT`
 - `merchants.birthday_bonus INT`
+- `merchants.shopify_domain` — NOT NULL constraint dropped (nullable now)
 
 **point_transactions.type values:** `earn_order`, `earn_signup`, `earn_referral`, `earn_follow`, `earn_birthday`, `redeem`
 
 ## How the product works end-to-end
-1. **Merchant connects** → visits `goldpoints-shopify.vercel.app`, enters `.myshopify.com` domain → Shopify OAuth → stored in `merchants` table
-2. **Merchant installs widget** → copies script tag from Install tab → pastes into Shopify theme `<body>` with Liquid conditional
-3. **Customer visits store** → sees floating 🎁 pill button in merchant's brand color with their chosen title
-4. **Not logged in (Shopify):** widget shows welcome carousel (Place order / Refer a Friend / Follow us cards) + Register/Login buttons → go to Shopify native `/account/register` or `/account/login`
-5. **Logged in (Shopify):** Liquid passes `data-customer-email` + `data-customer-name` to script tag → widget auto-detects → if customer exists in DB goes to home tabs, if new shows profile completion screen
-6. **Profile completion:** name + email (locked from Shopify), birthday (optional), marketing consent (optional) → saved to `customers` table → signup bonus awarded
-7. **Home tabs (logged in):**
-   - **Home:** Refer a Friend section (unique URL + copy + Facebook share) + Tier progress bar + Ways to Earn card
-   - **Rewards:** Redeem active offers → generates real Shopify discount codes
-   - **Offers:** Full list of earning methods with points values
-   - **👤 Profile:** Edit birthday/consent, sign out
-8. **Referral system:** customer's unique referral link → `goldpoints-shopify.vercel.app/ref/[code]` → server redirects to `https://[store]?gp_ref=[code]` → widget reads `gp_ref` from URL, saves to localStorage → when new customer completes profile, referrer is credited
-9. **Social follow:** customer clicks "Follow & Claim" → social page opens in new tab + points awarded once (tracked via `earn_follow` transaction — honor system, cannot verify)
-10. **Order points:** Shopify webhook → `points_per_dollar × order total` added to customer
-11. **Customer portal:** `goldpoints-shopify.vercel.app` → "I'm a Customer" → email+password → auto-redirected to their dashboard
+1. **Tony creates merchant** → `/admin` → Add Merchant (store name + email + password) → welcome email sent to Tony's Gmail (TEST_EMAIL) during dev
+2. **Merchant logs in** → `goldpoints-shopify.vercel.app` → "I'm a Merchant" → email + password → `merchant_session` cookie set → dashboard opens
+3. **Merchant connects Shopify** → yellow banner in dashboard → enters `.myshopify.com` domain → OAuth → access token stored, `shopify_domain` updated on merchant record
+4. **Merchant installs widget** → Install tab → copies Liquid snippet → pastes in theme.liquid before `</body>`
+5. **Customer visits store** → sees 🎁 pill button in merchant's brand color
+6. **Not logged in:** welcome carousel + Register/Login buttons → Shopify native auth
+7. **Logged in (Shopify):** Liquid passes email+name → widget auto-detects → profile completion or home tabs
+8. **Home tabs:** Home (referral + tier) | Rewards (redeem) | Offers (earning methods) | 👤 (profile/password)
+9. **Order points:** webhook fires → points_per_dollar × total awarded
+10. **Referral:** unique link → `/ref/[code]` → store with `?gp_ref=` → credited on new customer join
+
+## Merchant auth flow
+- Tony creates accounts manually via `/admin` — this is intentional (paid service, controlled onboarding)
+- Login: email + password → POST `/api/merchant/login` → `merchant_session` cookie (merchant UUID, 7 days)
+- Session check: all `/api/merchant/*` routes read `merchant_session` cookie → look up merchant by ID
+- Logout: DELETE `/api/merchant/me` → clears cookie
+- Change password: Account tab in dashboard → POST `/api/merchant/change-password`
+- Shopify connection: inside dashboard → enter domain → `/api/auth/install?shop=domain&merchant_id=ID` → OAuth → callback updates merchant record
 
 ## Widget install snippet (Liquid — goes in Shopify theme before </body>)
 ```liquid
@@ -155,19 +175,11 @@ supabase/
 {% endif %}
 ```
 
-## Widget state variables
-```javascript
-let homeTab       = 'home'    // 'home' | 'rewards' | 'offers' | 'profile'
-let welcomeSlide  = 0         // 0 = Place order + Refer a Friend, 1 = Follow us
-let welcomeDetail = null      // null | 'order' | 'refer' | 'follow'
-```
-
 ## Customer auth flow
-- **Widget (Shopify-logged-in):** Shopify passes email+name via Liquid attributes. Widget calls `/api/widget/points` to check if they exist in DB. If yes → home tabs. If no → profile completion form.
-- **Profile completion:** birthday and consent are optional. Saves via `/api/widget/profile`.
-- **Portal login:** email + password → bcrypt verified → dashboard
-- **Multi-store:** if same email+password is at multiple stores, store picker is shown
-- **Referral code survival:** `gp_ref` param is saved to localStorage immediately on page load so it survives the Shopify register/login redirect. Cleared after first profile save.
+- Widget (Shopify-logged-in): email+name passed via Liquid attributes → checked against DB → home or profile completion
+- Birthday and consent are optional in profile completion
+- Referral code (`gp_ref`) saved to localStorage immediately on page load — survives Shopify auth redirect
+- Portal login: email + password → bcrypt verified
 
 ## Tiers
 | Tier | Min points | Icon |
@@ -176,57 +188,37 @@ let welcomeDetail = null      // null | 'order' | 'refer' | 'follow'
 | Silver | 500 | 🥈 |
 | Gold | 1000 | 🥇 |
 
-## Merchant settings (configurable per merchant)
-- `points_per_dollar` — points earned per $1 spent on orders
-- `signup_bonus` — one-time points when customer completes profile
-- `birthday_bonus` — points on birthday (column exists, logic not yet wired)
-- `referral_points` — points awarded to referrer when a new customer joins via their link
-- `follow_points` — one-time points for social media follow
-- `social_follow_url` — URL to open when customer clicks Follow (Instagram, Facebook, etc.)
-- `widget_primary_color` — hex color for the widget button and accents
-- `widget_title` — text shown on the pill launcher button
-- `widget_position` — `bottom-right` or `bottom-left`
-
-## Merchant auth
-Cookie `merchant_shop` set after Shopify OAuth. All `/api/merchant/*` routes verify this cookie.
+## Merchant settings
+`points_per_dollar`, `signup_bonus`, `birthday_bonus`, `referral_points`, `follow_points`, `social_follow_url`, `widget_primary_color`, `widget_title`, `widget_position`
 
 ## Admin
-- URL: `goldpoints-shopify.vercel.app/admin` (not linked anywhere — Tony accesses it directly)
+- URL: `goldpoints-shopify.vercel.app/admin` (not linked — Tony accesses directly)
 - Password: `admin123` (env var `ADMIN_PASSWORD`)
-- Can: view all merchants, pause/activate merchants, delete merchants, add merchants manually, view portal for any merchant
-
-## Test file
-`Desktop\widget-test.html` — open in browser to preview widget locally without a real Shopify store. Uses `teststore.myshopify.com` — make sure that domain exists in the DB (add it via /admin).
-
-## Webhook setup (merchant must do once in Shopify Admin)
-Settings → Notifications → Webhooks → Add webhook:
-- Event: Order creation
-- URL: `https://goldpoints-shopify.vercel.app/api/webhooks/orders`
-- Format: JSON
+- Creates merchant accounts with email + password + optional Shopify domain
+- Can pause/activate/delete merchants, view all stats
 
 ## What's working (as of 2026-05-16)
-- Shopify OAuth for merchants
-- Merchant dashboard: customers list, offers CRUD, widget customization, install snippet with Liquid
-- Widget: pill launcher, welcome carousel (Place order / Refer a Friend / Follow us), profile completion, tab-based home (Home / Rewards / Offers / 👤 Profile)
-- Home tab: Refer a Friend (unique URL + clipboard copy + Facebook share), tier progress bar, ways to earn card
-- Rewards tab: redeem offers → real Shopify discount codes
-- Offers tab: earning methods breakdown with points values
-- Profile tab: edit birthday/consent, sign out
-- Referral system: unique codes, /ref/[code] server redirect, localStorage persistence through auth redirect, referrer gets credited on new join
-- Social follow: honor-system one-time points, tracks via earn_follow transaction
-- Order points via Shopify webhook (HMAC verified)
-- Customer portal: email+password login, points/tier/history, redeem offers
-- Admin panel: platform stats, manage all merchants, add manually
-- Home page: Merchant tab + Customer tab (global email+password login → store picker or auto-redirect)
-- Password auth: bcryptjs hashing on register, bcrypt verification on portal login
-- Multi-store customer support
+- Merchant email+password login (Tony-controlled onboarding)
+- Welcome email via Resend on merchant creation (routed to TEST_EMAIL during dev)
+- Change password in merchant Account tab
+- Merchant connects Shopify from inside dashboard (OAuth with merchant_id in state)
+- Full widget: pill launcher, welcome carousel, profile completion, Home/Rewards/Offers/Profile tabs
+- Referral system: unique codes, /ref/[code] redirect, localStorage persistence through auth
+- Social follow: honor-system one-time points
+- Order points via webhook (HMAC verified)
+- Customer portal: email+password login, points, history, redeem
+- Admin: create merchants, stats, manage
+- GoldPoints logo as favicon and in welcome emails
+- Tab title: "GoldPoints — Loyalty Rewards for Shopify"
 
-## What is NOT yet built (next priorities)
-1. **Birthday bonus logic** — `birthday_bonus` column and `birthday` on customer exist, but no cron/webhook awards points on the customer's birthday
-2. **Email notifications** — welcome email, tier upgrade, birthday reward
-3. **Subscription/billing** — Stripe integration for merchants paying for GoldPoints
-4. **Analytics charts** — visual graphs in merchant dashboard
-5. **Forgot password** — customer password reset via email
+## What is NOT yet built
+1. **Email domain** — need to verify a domain on Resend to send to real merchant emails (remove TEST_EMAIL after)
+2. **Birthday bonus logic** — column exists, no cron/trigger yet
+3. **Customer tags in Shopify** — tag customers by tier (gp-gold etc.) + products bought — needs `write_customers` scope (already in app)
+4. **Email/WhatsApp campaigns** — merchants send campaigns to customer segments
+5. **Subscription/billing** — Stripe for merchant payments
+6. **Analytics charts** — visual graphs in merchant dashboard
+7. **Forgot password** — customer + merchant password reset via email
 
 ## Owner context
 Tony is a non-developer building this as a SaaS product. Keep explanations clear, implement directly without long preambles. Use `py -m pip` (not `pip`) if Python is ever needed. Never push to GitHub without Tony's explicit instruction.
