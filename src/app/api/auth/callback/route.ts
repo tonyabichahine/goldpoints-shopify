@@ -42,13 +42,12 @@ export async function GET(req: NextRequest) {
       res.cookies.set('merchant_session', '', { httpOnly: true, maxAge: 0 })
     }
 
-    // Auto-register orders/paid webhook (ignore errors — may already exist)
+    // Auto-register webhooks (ignore errors — may already exist)
+    const webhookBase = `https://${shop}/admin/api/2024-01/webhooks.json`
+    const whHeaders = { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' }
     try {
-      await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, {
-        method: 'POST',
-        headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhook: { topic: 'orders/paid', address: `${APP_URL}/api/webhooks/orders`, format: 'json' } }),
-      })
+      await fetch(webhookBase, { method: 'POST', headers: whHeaders, body: JSON.stringify({ webhook: { topic: 'orders/paid', address: `${APP_URL}/api/webhooks/orders`, format: 'json' } }) })
+      await fetch(webhookBase, { method: 'POST', headers: whHeaders, body: JSON.stringify({ webhook: { topic: 'orders/cancelled', address: `${APP_URL}/api/webhooks/orders/cancelled`, format: 'json' } }) })
     } catch { /* non-fatal */ }
 
     return res
