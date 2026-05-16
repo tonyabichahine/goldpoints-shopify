@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_title: string; widget_position: string; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 
 function MerchantDashboardInner() {
@@ -179,7 +179,8 @@ function MerchantDashboardInner() {
             <h2 className="text-2xl font-bold text-purple-400 mb-6">Widget Settings</h2>
             <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
               <div><label className="block text-sm text-gray-400 mb-1">Widget Title</label><input value={merchant.widget_title || ''} onChange={e => setMerchant(p => p ? {...p, widget_title: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Primary Color</label><input type="color" value={merchant.widget_primary_color || '#6c3fff'} onChange={e => setMerchant(p => p ? {...p, widget_primary_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Button Color</label><input type="color" value={merchant.widget_primary_color || '#6c3fff'} onChange={e => setMerchant(p => p ? {...p, widget_primary_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Button Text Color</label><input type="color" value={merchant.widget_btn_text_color || '#ffffff'} onChange={e => setMerchant(p => p ? {...p, widget_btn_text_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Position</label>
                 <select value={merchant.widget_position || 'bottom-right'} onChange={e => setMerchant(p => p ? {...p, widget_position: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
                   <option value="bottom-right">Bottom Right</option><option value="bottom-left">Bottom Left</option>

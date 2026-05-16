@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants')
-    .select('id, store_name, shopify_domain, email, widget_primary_color, widget_position, widget_title, points_per_dollar, signup_bonus, social_follow_url, follow_points, referral_points, shopify_access_token')
+    .select('id, store_name, shopify_domain, email, widget_primary_color, widget_btn_text_color, widget_position, widget_title, points_per_dollar, signup_bonus, social_follow_url, follow_points, referral_points, shopify_access_token')
     .eq('id', merchantId)
     .single()
 

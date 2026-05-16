@@ -127,6 +127,13 @@
     config = await api(`/api/widget/config?shop=${SHOP}`)
     if (config.error) { render('error'); return }
     btn.style.background = color()
+    const tc = config.widget_btn_text_color || '#ffffff'
+    btn.style.color = tc
+    const existingTc = document.getElementById('gp-tc-style')
+    if (existingTc) existingTc.remove()
+    const tcStyle = document.createElement('style'); tcStyle.id='gp-tc-style'
+    tcStyle.textContent = `.gp-btn-main{color:${tc}!important}`
+    document.head.appendChild(tcStyle)
     const label = document.getElementById('gp-btn-label')
     if (label) label.textContent = config.widget_title || 'Rewards'
     if (config.widget_position === 'bottom-left') { btn.style.right='auto'; btn.style.left='24px'; panel.style.right='auto'; panel.style.left='24px' }
@@ -149,8 +156,8 @@
     view = v
     const c = color()
     const title = (config && config.widget_title) || 'Rewards'
-    const isDetailView = (v === 'welcome' && welcomeDetail !== null) || v === 'register-form' || v === 'login-form'
-    const detailTitle = v === 'register-form' ? 'Create Account' : v === 'login-form' ? 'Sign In' : welcomeDetail === 'order' ? 'Place an order' : welcomeDetail === 'refer' ? 'Refer a Friend' : welcomeDetail === 'follow' ? 'Follow us online' : ''
+    const isDetailView = (v === 'welcome' && welcomeDetail !== null) || v === 'register-form' || v === 'login-form' || v === 'forgot-password'
+    const detailTitle = v === 'register-form' ? 'Create Account' : v === 'login-form' ? 'Sign In' : v === 'forgot-password' ? 'Forgot Password' : welcomeDetail === 'order' ? 'Place an order' : welcomeDetail === 'refer' ? 'Refer a Friend' : welcomeDetail === 'follow' ? 'Follow us online' : ''
     const backBtn = isDetailView ? `<button class="gp-header-back" id="gp-back-btn">‹</button>` : `<span style="width:28px"></span>`
 
     const showWelcomeBar = v === 'home' && customer
@@ -180,7 +187,7 @@
       ${(v === 'welcome' || v === 'lookup') ? `<div class="gp-footer">${footerHTML(c)}</div>` : ''}
     `
     document.getElementById('gp-close-btn').addEventListener('click', () => { open=false; panel.classList.remove('open') })
-    if (isDetailView) document.getElementById('gp-back-btn').addEventListener('click', () => { welcomeDetail=null; render('welcome') })
+    if (isDetailView) document.getElementById('gp-back-btn').addEventListener('click', () => { if (v==='forgot-password') render('login-form'); else { welcomeDetail=null; render('welcome') } })
     if (showTabs) document.querySelectorAll('.gp-tab, .gp-tab-icon').forEach(t => t.addEventListener('click', () => { homeTab=t.getAttribute('data-tab'); render('home') }))
     bindEvents(v, c)
   }
@@ -299,6 +306,18 @@
         <input class="gp-input" id="gp-login-password" type="password" placeholder="Your password" />
         <button class="gp-btn-main" id="gp-login-submit" style="background:${c}">Sign In</button>
         <p id="gp-login-msg" class="gp-msg"></p>
+        <button style="background:none;border:none;color:#7878a0;font-size:.78rem;cursor:pointer;margin-top:6px;padding:0;text-decoration:underline" id="gp-forgot-link">Forgot password?</button>
+      </div>
+    `
+
+    if (v === 'forgot-password') return `
+      <div style="padding-top:10px">
+        <p style="font-weight:700;font-size:.95rem;margin-bottom:4px">Reset Password</p>
+        <p class="gp-msg" style="text-align:left;padding:0 0 12px;margin:0">Enter your email and we'll send you a reset link.</p>
+        <label class="gp-field-label">Email *</label>
+        <input class="gp-input" id="gp-forgot-email" type="email" placeholder="your@email.com" />
+        <button class="gp-btn-main" id="gp-forgot-submit" style="background:${c}">Send Reset Link</button>
+        <p id="gp-forgot-msg" class="gp-msg"></p>
       </div>
     `
 
@@ -495,6 +514,20 @@
         const data = await api('/api/widget/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,password})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
         localStorage.setItem(STORAGE_KEY,email); customer=data.customer; render('home')
+      })
+      const forgotLink = document.getElementById('gp-forgot-link')
+      if (forgotLink) forgotLink.addEventListener('click', () => render('forgot-password'))
+    }
+
+    if (v === 'forgot-password') {
+      document.getElementById('gp-forgot-submit').addEventListener('click', async () => {
+        const email = document.getElementById('gp-forgot-email').value.trim()
+        const msg = document.getElementById('gp-forgot-msg')
+        if (!email) { msg.textContent='Please enter your email.'; msg.style.color='#e74c3c'; return }
+        msg.textContent='Sending...'; msg.style.color='#7878a0'
+        await api('/api/widget/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email})})
+        msg.textContent='Check your email for a reset link!'; msg.style.color='#2ecc71'
+        document.getElementById('gp-forgot-submit').disabled=true
       })
     }
 
