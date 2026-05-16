@@ -9,13 +9,17 @@ function MerchantDashboardInner() {
   const router = useRouter()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'widget' | 'install'>('overview')
+  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'widget' | 'install' | 'account'>('overview')
   const [customers, setCustomers] = useState<any[]>([])
   const [offers, setOffers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
   const [newOffer, setNewOffer] = useState({ name: '', description: '', points_required: 500, offer_type: 'percentage', offer_value: '10' })
   const [connectDomain, setConnectDomain] = useState('')
   const [connecting, setConnecting] = useState(false)
+  const [currPw, setCurrPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [pwMsg, setPwMsg] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
 
   useEffect(() => {
     fetch('/api/merchant/me')
@@ -99,7 +103,7 @@ function MerchantDashboardInner() {
       )}
 
       <nav className="flex gap-2 px-8 py-3 bg-[#16162a] border-b border-white/10 flex-wrap">
-        {(['overview','customers','offers','widget','install'] as const).map(t => (
+        {(['overview','customers','offers','widget','install','account'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
         ))}
       </nav>
@@ -230,6 +234,38 @@ function MerchantDashboardInner() {
                   <li>URL: <code className="text-purple-400 break-all">https://goldpoints-shopify.vercel.app/api/webhooks/orders</code></li>
                   <li>Save</li>
                 </ol>
+              </div>
+            </div>
+          </div>
+        )}
+        {tab === 'account' && (
+          <div className="max-w-md">
+            <h2 className="text-2xl font-bold text-purple-400 mb-6">Account</h2>
+            <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 mb-4">
+              <p className="text-sm text-gray-400 mb-1">Logged in as</p>
+              <p className="font-semibold">{merchant.email}</p>
+            </div>
+            <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
+              <h3 className="font-semibold mb-4">Change Password</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Current password</label>
+                  <input type="password" value={currPw} onChange={e => setCurrPw(e.target.value)} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">New password</label>
+                  <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500" />
+                </div>
+                {pwMsg && <p className={`text-xs ${pwMsg.includes('changed') ? 'text-green-400' : 'text-red-400'}`}>{pwMsg}</p>}
+                <button disabled={pwSaving} onClick={async () => {
+                  setPwSaving(true); setPwMsg('')
+                  const r = await fetch('/api/merchant/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: currPw, new_password: newPw }) })
+                  const d = await r.json()
+                  if (!r.ok) { setPwMsg(d.error); } else { setPwMsg('Password changed successfully!'); setCurrPw(''); setNewPw('') }
+                  setPwSaving(false)
+                }} className="w-full bg-gradient-to-r from-purple-700 to-purple-500 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">
+                  {pwSaving ? 'Saving...' : 'Change Password'}
+                </button>
               </div>
             </div>
           </div>
