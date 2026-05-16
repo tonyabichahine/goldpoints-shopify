@@ -24,7 +24,7 @@
   // ── Styles ────────────────────────────────────────────────────────────
   const style = document.createElement('style')
   style.textContent = `
-    #gp-btn{position:fixed;bottom:24px;right:24px;height:48px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:8px;z-index:99998;font-size:.9rem;font-weight:700;color:#fff;transition:transform .2s,opacity .2s;white-space:nowrap;background:#6c3fff}
+    #gp-btn{position:fixed;bottom:24px;right:24px;height:48px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:8px;z-index:99998;font-size:.9rem;font-weight:700;color:#fff;transition:transform .2s;white-space:nowrap;background:#6c3fff;opacity:0}
     #gp-btn:hover{transform:translateY(-2px);opacity:.92}
     #gp-panel{position:fixed;bottom:90px;right:24px;width:340px;max-height:580px;background:#16162a;border:1px solid rgba(255,255,255,.1);border-radius:20px;overflow:hidden;display:none;flex-direction:column;z-index:99999;box-shadow:0 8px 40px rgba(0,0,0,.6);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e0e0f0}
     #gp-panel.open{display:flex}
@@ -136,7 +136,21 @@
     document.head.appendChild(tcStyle)
     const label = document.getElementById('gp-btn-label')
     if (label) label.textContent = config.widget_title || 'Rewards'
-    if (config.widget_position === 'bottom-left') { btn.style.right='auto'; btn.style.left='24px'; panel.style.right='auto'; panel.style.left='24px' }
+    // Apply position + offsets
+    const pos = config.widget_position || 'bottom-right'
+    const ob = config.widget_offset_bottom ?? 24
+    const os = config.widget_offset_side ?? 24
+    const isLeft = pos.includes('left')
+    const isTop = pos.includes('top')
+    btn.style.bottom = isTop ? 'auto' : `${ob}px`
+    btn.style.top    = isTop ? `${ob}px` : 'auto'
+    btn.style.right  = isLeft ? 'auto' : `${os}px`
+    btn.style.left   = isLeft ? `${os}px` : 'auto'
+    panel.style.bottom = isTop ? 'auto' : `${ob + 64}px`
+    panel.style.top    = isTop ? `${ob + 64}px` : 'auto'
+    panel.style.right  = isLeft ? 'auto' : `${os}px`
+    panel.style.left   = isLeft ? `${os}px` : 'auto'
+    btn.style.opacity = '1'
 
     if (CUSTOMER_EMAIL) {
       const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(CUSTOMER_EMAIL)}`)

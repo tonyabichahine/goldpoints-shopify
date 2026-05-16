@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 
 function MerchantDashboardInner() {
@@ -183,9 +183,14 @@ function MerchantDashboardInner() {
               <div><label className="block text-sm text-gray-400 mb-1">Button Text Color</label><input type="color" value={merchant.widget_btn_text_color || '#ffffff'} onChange={e => setMerchant(p => p ? {...p, widget_btn_text_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Position</label>
                 <select value={merchant.widget_position || 'bottom-right'} onChange={e => setMerchant(p => p ? {...p, widget_position: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
-                  <option value="bottom-right">Bottom Right</option><option value="bottom-left">Bottom Left</option>
+                  <option value="bottom-right">Bottom Right</option>
+                  <option value="bottom-left">Bottom Left</option>
+                  <option value="top-right">Top Right</option>
+                  <option value="top-left">Top Left</option>
                 </select>
               </div>
+              <div><label className="block text-sm text-gray-400 mb-1">Vertical spacing (px)</label><input type="number" value={merchant.widget_offset_bottom ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_bottom: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
               <div className="border-t border-white/10 pt-4">
