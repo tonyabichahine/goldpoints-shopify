@@ -58,6 +58,8 @@ export default function AdminPage() {
     if (!r.ok) { setAddError(d.error); setAdding(false); return }
     setNewM({ shopify_domain: '', store_name: '', email: '', password: '' })
     setShowAdd(false); setAdding(false)
+    if (d.email_error) alert(`Merchant created but email failed: ${d.email_error}`)
+    else alert('Merchant created and welcome email sent!')
     load()
   }
 

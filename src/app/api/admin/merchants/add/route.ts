@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Send welcome email
-  await resend.emails.send({
+  const emailResult = await resend.emails.send({
     from: 'GoldPoints <onboarding@resend.dev>',
     to: email,
     subject: 'Welcome to GoldPoints — Your Account is Ready',
@@ -60,5 +60,5 @@ export async function POST(req: NextRequest) {
     `,
   })
 
-  return NextResponse.json(data)
+  return NextResponse.json({ ...data, email_sent: !emailResult.error, email_error: emailResult.error?.message || null })
 }
