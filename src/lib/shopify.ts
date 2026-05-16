@@ -31,14 +31,14 @@ export async function createDiscountCode(shop: string, token: string, code: stri
         price_rule: {
           title: code, target_type: 'shipping_line', target_selection: 'all',
           allocation_method: 'across', value_type: 'percentage', value: '-100.0',
-          customer_selection: 'all', starts_at: new Date().toISOString(),
+          customer_selection: 'all', starts_at: new Date().toISOString(), usage_limit: 1,
         }
       }
     : {
         price_rule: {
           title: code, target_type: 'line_item', target_selection: 'all',
           allocation_method: 'across', value_type: 'percentage', value: `-${value}`,
-          customer_selection: 'all', starts_at: new Date().toISOString(),
+          customer_selection: 'all', starts_at: new Date().toISOString(), usage_limit: 1,
         }
       }
 
