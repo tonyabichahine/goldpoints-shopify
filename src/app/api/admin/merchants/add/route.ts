@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
     subject: 'Welcome to GoldPoints — Your Account is Ready',
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#0f0f1a;color:#e0e0f0;padding:40px;border-radius:16px">
+        <div style="margin-bottom:24px">
+          <img src="https://goldpoints-shopify.vercel.app/logo.png" alt="GoldPoints" width="72" height="72" style="border-radius:16px" />
+        </div>
         <div style="font-size:28px;font-weight:800;margin-bottom:4px">
           <span style="color:#a78bfa">Gold</span><span style="color:#fbbf24">Points</span>
         </div>
