@@ -31,7 +31,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
-  const [newM, setNewM] = useState({ shopify_domain: '', store_name: '', email: '' })
+  const [newM, setNewM] = useState({ shopify_domain: '', store_name: '', email: '', password: '' })
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
 
@@ -51,12 +51,12 @@ export default function AdminPage() {
   }
 
   async function addMerchant() {
-    if (!newM.shopify_domain || !newM.store_name) { setAddError('Domain and store name are required.'); return }
+    if (!newM.store_name || !newM.email || !newM.password) { setAddError('Store name, email, and password are required.'); return }
     setAdding(true); setAddError('')
     const r = await fetch('/api/admin/merchants/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newM) })
     const d = await r.json()
     if (!r.ok) { setAddError(d.error); setAdding(false); return }
-    setNewM({ shopify_domain: '', store_name: '', email: '' })
+    setNewM({ shopify_domain: '', store_name: '', email: '', password: '' })
     setShowAdd(false); setAdding(false)
     load()
   }
@@ -109,18 +109,22 @@ export default function AdminPage() {
         {showAdd && (
           <div className="bg-[#16162a] border border-yellow-500/30 rounded-xl p-5 mb-5">
             <h3 className="font-semibold mb-4 text-sm">Add merchant manually (non-Shopify or pre-onboarding)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Store / Business Name *</label>
                 <input value={newM.store_name} onChange={e => setNewM(p => ({...p, store_name: e.target.value}))} placeholder="e.g. Bella Boutique" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Shopify Domain *</label>
-                <input value={newM.shopify_domain} onChange={e => setNewM(p => ({...p, shopify_domain: e.target.value}))} placeholder="mystore.myshopify.com" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
+                <label className="block text-xs text-gray-400 mb-1">Login Email *</label>
+                <input type="email" value={newM.email} onChange={e => setNewM(p => ({...p, email: e.target.value}))} placeholder="owner@store.com" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Email (optional)</label>
-                <input value={newM.email} onChange={e => setNewM(p => ({...p, email: e.target.value}))} placeholder="owner@store.com" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
+                <label className="block text-xs text-gray-400 mb-1">Password *</label>
+                <input type="password" value={newM.password} onChange={e => setNewM(p => ({...p, password: e.target.value}))} placeholder="Set their login password" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Shopify Domain (optional — they can connect later)</label>
+                <input value={newM.shopify_domain} onChange={e => setNewM(p => ({...p, shopify_domain: e.target.value}))} placeholder="mystore.myshopify.com" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-500" />
               </div>
             </div>
             {addError && <p className="text-red-400 text-xs mt-2">{addError}</p>}

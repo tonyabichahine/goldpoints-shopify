@@ -4,9 +4,11 @@ import crypto from 'crypto'
 
 export async function GET(req: NextRequest) {
   const shop = req.nextUrl.searchParams.get('shop')
+  const merchantId = req.nextUrl.searchParams.get('merchant_id') || ''
   if (!shop) return NextResponse.json({ error: 'Missing shop' }, { status: 400 })
 
-  const state = crypto.randomBytes(16).toString('hex')
+  const nonce = crypto.randomBytes(16).toString('hex')
+  const state = merchantId ? `${nonce}:${merchantId}` : nonce
   const url = getInstallUrl(shop, state)
 
   const res = NextResponse.redirect(url)

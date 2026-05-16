@@ -10,8 +10,11 @@ interface Store {
 }
 
 export default function Home() {
-  const [shop, setShop] = useState('')
   const [tab, setTab] = useState<'merchant' | 'customer'>('merchant')
+  const [mEmail, setMEmail] = useState('')
+  const [mPassword, setMPassword] = useState('')
+  const [mLoading, setMLoading] = useState(false)
+  const [mError, setMError] = useState('')
   const [cEmail, setCEmail] = useState('')
   const [cPassword, setCPassword] = useState('')
   const [cLoading, setCLoading] = useState(false)
@@ -19,10 +22,13 @@ export default function Home() {
   const [stores, setStores] = useState<Store[]>([])
   const router = useRouter()
 
-  function connectShopify() {
-    if (!shop) return
-    const domain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`
-    window.location.href = `/api/auth/install?shop=${domain}`
+  async function merchantLogin() {
+    if (!mEmail || !mPassword) { setMError('Please enter your email and password.'); return }
+    setMLoading(true); setMError('')
+    const r = await fetch('/api/merchant/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: mEmail, password: mPassword }) })
+    const data = await r.json()
+    if (!r.ok) { setMError(data.error || 'Login failed.'); setMLoading(false); return }
+    router.push('/merchant')
   }
 
   async function customerLogin() {
@@ -60,11 +66,18 @@ export default function Home() {
         {tab === 'merchant' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Your Shopify store</label>
-              <input value={shop} onChange={e => setShop(e.target.value)} placeholder="yourstore.myshopify.com" onKeyDown={e => e.key === 'Enter' && connectShopify()} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-purple-500" />
+              <label className="block text-sm text-gray-400 mb-1">Email address</label>
+              <input type="email" value={mEmail} onChange={e => setMEmail(e.target.value)} placeholder="you@store.com" onKeyDown={e => e.key === 'Enter' && merchantLogin()} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-purple-500" />
             </div>
-            <button onClick={connectShopify} className="w-full bg-gradient-to-r from-purple-700 to-purple-500 py-3 rounded-xl font-semibold text-sm hover:opacity-90 transition">Connect with Shopify</button>
-            <p className="text-xs text-gray-600 text-center">You will be redirected to Shopify to approve access</p>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Password</label>
+              <input type="password" value={mPassword} onChange={e => setMPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && merchantLogin()} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-purple-500" />
+            </div>
+            {mError && <p className="text-red-400 text-xs">{mError}</p>}
+            <button onClick={merchantLogin} disabled={mLoading} className="w-full bg-gradient-to-r from-purple-700 to-purple-500 py-3 rounded-xl font-semibold text-sm hover:opacity-90 transition disabled:opacity-50">
+              {mLoading ? 'Logging in...' : 'Log In →'}
+            </button>
+            <p className="text-xs text-gray-600 text-center">Don&apos;t have an account? Contact us to get started.</p>
           </div>
         )}
 
