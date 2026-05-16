@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   // Send welcome email
   const emailResult = await resend.emails.send({
     from: 'GoldPoints <onboarding@resend.dev>',
-    to: email,
+    to: process.env.TEST_EMAIL || email,
     subject: 'Welcome to GoldPoints — Your Account is Ready',
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#0f0f1a;color:#e0e0f0;padding:40px;border-radius:16px">
