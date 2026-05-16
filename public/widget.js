@@ -13,6 +13,7 @@
 
   let config        = null
   let customer      = null
+  let redemptions   = []
   let open          = false
   let view          = 'loading'
   let homeTab       = 'home'    // 'home' | 'rewards' | 'offers' | 'profile'
@@ -154,13 +155,13 @@
 
     if (CUSTOMER_EMAIL) {
       const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(CUSTOMER_EMAIL)}`)
-      if (data.found) { customer=data.customer; localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); render('home') }
+      if (data.found) { customer=data.customer; redemptions=data.redemptions||[]; localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); render('home') }
       else render('profile')
     } else {
       const saved = localStorage.getItem(STORAGE_KEY) || ''
       if (saved) {
         const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(saved)}`)
-        if (data.found) { customer=data.customer; render('home') } else { welcomeSlide=0; render('welcome') }
+        if (data.found) { customer=data.customer; redemptions=data.redemptions||[]; render('home') } else { welcomeSlide=0; render('welcome') }
       } else { welcomeSlide=0; render('welcome') }
     }
   }
@@ -388,8 +389,23 @@
 
       if (homeTab === 'rewards') {
         const offers = (config.offers||[])
-        if (!offers.length) return '<p class="gp-msg" style="padding:20px 0">No rewards available yet — check back soon!</p>'
-        return offers.map(o => `
+        const activeCodes = redemptions.slice(0,3)
+        const codesHTML = activeCodes.length ? `
+          <div style="margin-bottom:12px">
+            <p style="font-weight:700;font-size:.85rem;margin-bottom:8px;color:#c0c0d8">Your Recent Codes</p>
+            ${activeCodes.map(r => {
+              const offerName = r.offers ? (Array.isArray(r.offers) ? r.offers[0]?.name : r.offers.name) : ''
+              return `<div class="gp-code-box" style="margin-bottom:8px">
+                <div style="font-size:.75rem;color:#7878a0;margin-bottom:2px">${esc(offerName||'Discount')}</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="gp-code" style="flex:1" id="rc-${esc(r.discount_code)}">${esc(r.discount_code)}</div>
+                  <button class="gp-ref-btn gp-copy-rcode" data-code="${esc(r.discount_code)}" title="Copy">📋</button>
+                </div>
+              </div>`
+            }).join('')}
+          </div>` : ''
+        if (!offers.length) return codesHTML || '<p class="gp-msg" style="padding:20px 0">No rewards available yet — check back soon!</p>'
+        return codesHTML + offers.map(o => `
           <div class="gp-offer">
             <div class="gp-offer-name">${esc(o.name)}</div>
             <div class="gp-offer-meta">${esc(o.description||'')} · <span style="color:#c47aff">${o.points_required} pts</span></div>
@@ -568,6 +584,14 @@
       const waysCard = document.getElementById('gp-ways-card')
       if (waysCard) waysCard.addEventListener('click', () => { homeTab='offers'; render('home') })
 
+      // Copy recent code buttons
+      document.querySelectorAll('.gp-copy-rcode').forEach(b => {
+        b.addEventListener('click', () => {
+          navigator.clipboard.writeText(b.getAttribute('data-code')||'').catch(()=>{})
+          b.textContent='✓'; setTimeout(()=>{ b.textContent='📋' },1500)
+        })
+      })
+
       // Redeem buttons
       document.querySelectorAll('.gp-redeem-btn:not([disabled])').forEach(b => {
         b.addEventListener('click', async () => {
@@ -578,6 +602,8 @@
           const area = document.getElementById('gp-code-area')
           if (data.error) { area.innerHTML=`<p class="gp-msg" style="color:#e74c3c">${esc(data.error)}</p>`; b.disabled=false; b.textContent='Redeem'; return }
           customer.points=data.newPoints
+          const offerName = b.closest('.gp-offer')?.querySelector('.gp-offer-name')?.textContent||''
+          redemptions=[{discount_code:data.discountCode,offers:{name:offerName},created_at:new Date().toISOString()},...redemptions].slice(0,5)
           area.innerHTML=`<div class="gp-code-box"><div style="font-size:.8rem;color:#7878a0;margin-bottom:4px">Your discount code:</div><div class="gp-code">${esc(data.discountCode)}</div></div>`
         })
       })

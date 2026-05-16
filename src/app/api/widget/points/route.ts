@@ -20,5 +20,15 @@ export async function GET(req: NextRequest) {
     .from('customers').select('id, name, email, points, tier, birthday, referral_code').eq('merchant_id', merchant.id).eq('email', email).single()
   if (!customer) return NextResponse.json({ found: false }, { headers: cors })
 
-  return NextResponse.json({ found: true, customer }, { headers: cors })
+  // Return recent redemption codes so widget can show them even after panel is closed
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const { data: redemptions } = await supabaseAdmin
+    .from('redemptions')
+    .select('discount_code, created_at, offers(name)')
+    .eq('customer_id', customer.id)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  return NextResponse.json({ found: true, customer, redemptions: redemptions || [] }, { headers: cors })
 }
