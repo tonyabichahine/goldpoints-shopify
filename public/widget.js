@@ -149,8 +149,8 @@
     view = v
     const c = color()
     const title = (config && config.widget_title) || 'Rewards'
-    const isDetailView = v === 'welcome' && welcomeDetail !== null
-    const detailTitle = welcomeDetail === 'order' ? 'Place an order' : welcomeDetail === 'refer' ? 'Refer a Friend' : welcomeDetail === 'follow' ? 'Follow us online' : ''
+    const isDetailView = (v === 'welcome' && welcomeDetail !== null) || v === 'register-form' || v === 'login-form'
+    const detailTitle = v === 'register-form' ? 'Create Account' : v === 'login-form' ? 'Sign In' : welcomeDetail === 'order' ? 'Place an order' : welcomeDetail === 'refer' ? 'Refer a Friend' : welcomeDetail === 'follow' ? 'Follow us online' : ''
     const backBtn = isDetailView ? `<button class="gp-header-back" id="gp-back-btn">‹</button>` : `<span style="width:28px"></span>`
 
     const showWelcomeBar = v === 'home' && customer
@@ -274,6 +274,34 @@
       <p id="gp-lookup-msg" class="gp-msg"></p>
     `
 
+    if (v === 'register-form') return `
+      <div style="padding-top:10px">
+        <p style="font-weight:700;font-size:.95rem;margin-bottom:4px">Create Account</p>
+        <p class="gp-msg" style="text-align:left;padding:0 0 12px;margin:0">Join the loyalty program and start earning points.</p>
+        <label class="gp-field-label">Name *</label>
+        <input class="gp-input" id="gp-reg-name" placeholder="Your name" />
+        <label class="gp-field-label">Email *</label>
+        <input class="gp-input" id="gp-reg-email" type="email" placeholder="your@email.com" />
+        <label class="gp-field-label">Password *</label>
+        <input class="gp-input" id="gp-reg-password" type="password" placeholder="Create a password" />
+        <button class="gp-btn-main" id="gp-reg-submit" style="background:${c}">Create Account</button>
+        <p id="gp-reg-msg" class="gp-msg"></p>
+      </div>
+    `
+
+    if (v === 'login-form') return `
+      <div style="padding-top:10px">
+        <p style="font-weight:700;font-size:.95rem;margin-bottom:4px">Sign In</p>
+        <p class="gp-msg" style="text-align:left;padding:0 0 12px;margin:0">Sign in to see your points and rewards.</p>
+        <label class="gp-field-label">Email *</label>
+        <input class="gp-input" id="gp-login-email" type="email" placeholder="your@email.com" />
+        <label class="gp-field-label">Password *</label>
+        <input class="gp-input" id="gp-login-password" type="password" placeholder="Your password" />
+        <button class="gp-btn-main" id="gp-login-submit" style="background:${c}">Sign In</button>
+        <p id="gp-login-msg" class="gp-msg"></p>
+      </div>
+    `
+
     // ── HOME (logged in) ─────────────────────────────────────────────────
     if (v === 'home' && customer) {
       const pts = customer.points || 0
@@ -388,8 +416,8 @@
     if (v === 'welcome') {
       const reg = document.getElementById('gp-shopify-register')
       const log = document.getElementById('gp-shopify-login')
-      if (reg) reg.addEventListener('click', () => { window.location.href='/account/register' })
-      if (log) log.addEventListener('click', () => { window.location.href='/account/login' })
+      if (reg) reg.addEventListener('click', () => render('register-form'))
+      if (log) log.addEventListener('click', () => render('login-form'))
       document.querySelectorAll('.gp-dot').forEach(d => d.addEventListener('click', () => { welcomeSlide=parseInt(d.getAttribute('data-slide')); welcomeDetail=null; render('welcome') }))
       const co = document.getElementById('gp-card-order')
       const cr = document.getElementById('gp-card-refer')
@@ -430,8 +458,8 @@
     if (v === 'lookup') {
       const reg = document.getElementById('gp-shopify-register')
       const log = document.getElementById('gp-shopify-login')
-      if (reg) reg.addEventListener('click', () => { window.location.href='/account/register' })
-      if (log) log.addEventListener('click', () => { window.location.href='/account/login' })
+      if (reg) reg.addEventListener('click', () => render('register-form'))
+      if (log) log.addEventListener('click', () => render('login-form'))
       document.getElementById('gp-lookup-btn').addEventListener('click', async () => {
         const email = document.getElementById('gp-lookup-email').value.trim()
         const msg = document.getElementById('gp-lookup-msg')
@@ -439,6 +467,33 @@
         msg.textContent='Looking up...'; msg.style.color='#7878a0'
         const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(email)}`)
         if (!data.found) { msg.textContent='Email not found. Register first.'; msg.style.color='#e74c3c'; return }
+        localStorage.setItem(STORAGE_KEY,email); customer=data.customer; render('home')
+      })
+    }
+
+    if (v === 'register-form') {
+      document.getElementById('gp-reg-submit').addEventListener('click', async () => {
+        const name = document.getElementById('gp-reg-name').value.trim()
+        const email = document.getElementById('gp-reg-email').value.trim()
+        const password = document.getElementById('gp-reg-password').value
+        const msg = document.getElementById('gp-reg-msg')
+        if (!name || !email || !password) { msg.textContent='All fields are required.'; msg.style.color='#e74c3c'; return }
+        msg.textContent='Creating account...'; msg.style.color='#7878a0'
+        const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name,password,gp_ref:GP_REF})})
+        if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
+        localStorage.setItem(STORAGE_KEY,email); localStorage.removeItem(REF_STORAGE_KEY); customer=data.customer; render('home')
+      })
+    }
+
+    if (v === 'login-form') {
+      document.getElementById('gp-login-submit').addEventListener('click', async () => {
+        const email = document.getElementById('gp-login-email').value.trim()
+        const password = document.getElementById('gp-login-password').value
+        const msg = document.getElementById('gp-login-msg')
+        if (!email || !password) { msg.textContent='Email and password are required.'; msg.style.color='#e74c3c'; return }
+        msg.textContent='Signing in...'; msg.style.color='#7878a0'
+        const data = await api('/api/widget/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,password})})
+        if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
         localStorage.setItem(STORAGE_KEY,email); customer=data.customer; render('home')
       })
     }
