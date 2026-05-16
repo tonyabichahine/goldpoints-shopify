@@ -42,6 +42,15 @@ export async function GET(req: NextRequest) {
       res.cookies.set('merchant_session', '', { httpOnly: true, maxAge: 0 })
     }
 
+    // Auto-register orders/paid webhook (ignore errors — may already exist)
+    try {
+      await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, {
+        method: 'POST',
+        headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhook: { topic: 'orders/paid', address: `${APP_URL}/api/webhooks/orders`, format: 'json' } }),
+      })
+    } catch { /* non-fatal */ }
+
     return res
   } catch {
     return NextResponse.redirect(`${APP_URL}/?error=auth_failed`)
