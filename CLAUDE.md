@@ -47,7 +47,7 @@ SHOPIFY_API_SECRET=<from Shopify Partners dashboard>
 SHOPIFY_SCOPES=read_orders,read_customers,write_customers,write_discounts
 NEXT_PUBLIC_APP_URL=https://goldpoints-shopify.vercel.app
 ADMIN_PASSWORD=admin123
-RESEND_API_KEY=re_BxBWcFy3_FKefdAbreuFri8PCW6o6JNSF
+RESEND_API_KEY=<from resend.com dashboard — rotate if exposed>
 TEST_EMAIL=tonyabichahine@gmail.com   ← dev only: routes all emails to Tony until domain verified
 ```
 On Vercel all of these are set as Environment Variables. `TEST_EMAIL` is temporary — remove it once a real domain is verified on Resend.
@@ -197,6 +197,12 @@ supabase/
 - Creates merchant accounts with email + password + optional Shopify domain
 - Can pause/activate/delete merchants, view all stats
 
+## Test store
+- **Scarpe** — `pc0w3w-y4.myshopify.com` (Tony's test Shopify store)
+- Widget snippet installed in **Scarpe - Dev** unpublished theme (safe — does not affect live "Rebel" theme)
+- Shopify Partner app connected to this store via OAuth; access token stored on merchant record
+- To test: Shopify Admin → Online Store → Themes → Scarpe - Dev → Preview
+
 ## What's working (as of 2026-05-16)
 - Merchant email+password login (Tony-controlled onboarding)
 - Welcome email via Resend on merchant creation (routed to TEST_EMAIL during dev)
@@ -210,6 +216,7 @@ supabase/
 - Admin: create merchants, stats, manage
 - GoldPoints logo as favicon and in welcome emails
 - Tab title: "GoldPoints — Loyalty Rewards for Shopify"
+- Widget snippet installed in Scarpe Dev unpublished theme for testing
 
 ## What is NOT yet built
 1. **Email domain** — need to verify a domain on Resend to send to real merchant emails (remove TEST_EMAIL after)
