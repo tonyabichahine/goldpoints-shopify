@@ -11,11 +11,14 @@ interface Analytics {
   recentActivity: { points: number; type: string; description: string; created_at: string; customerName: string }[]
 }
 
-function BarChart({ title, data, color }: { title: string; data: { date: string; value: number }[]; color: string }) {
+function BarChart({ title, data, color, onSeeAll }: { title: string; data: { date: string; value: number }[]; color: string; onSeeAll?: () => void }) {
   const max = Math.max(...data.map(d => d.value), 1)
   return (
     <div className="bg-[#16162a] border border-white/10 rounded-xl p-4">
-      <div className="text-sm font-semibold text-gray-300 mb-3">{title}</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-semibold text-gray-300">{title}</div>
+        {onSeeAll && <button onClick={onSeeAll} className="text-xs text-gray-500 hover:text-white transition">See all →</button>}
+      </div>
       <div className="flex items-end gap-0.5" style={{ height: '80px' }}>
         {data.map(d => (
           <div key={d.date} className="flex-1 rounded-t-sm" style={{ height: `${(d.value / max) * 80}px`, backgroundColor: color, minHeight: d.value > 0 ? '2px' : '0px' }} />
@@ -47,6 +50,7 @@ function MerchantDashboardInner() {
   const [pwSaving, setPwSaving] = useState(false)
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean }>({ type: null, data: [], loading: false })
 
   useEffect(() => {
     fetch('/api/merchant/me')
@@ -76,6 +80,14 @@ function MerchantDashboardInner() {
     if (r.ok) setAnalytics(await r.json())
     setAnalyticsLoading(false)
   }
+
+  async function openDrawer(type: string) {
+    setDrawer({ type, data: [], loading: true })
+    const r = await fetch(`/api/merchant/analytics/detail?type=${type}`)
+    setDrawer({ type, data: r.ok ? await r.json() : [], loading: false })
+  }
+
+  function closeDrawer() { setDrawer({ type: null, data: [], loading: false }) }
 
   async function saveSettings() {
     if (!merchant) return
@@ -152,21 +164,22 @@ function MerchantDashboardInner() {
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: 'Total Members', value: analytics.totalCustomers.toLocaleString(), color: 'text-purple-400' },
-                    { label: 'Points Issued (30d)', value: analytics.totalPointsIssued.toLocaleString(), color: 'text-yellow-400' },
-                    { label: 'Points Redeemed (30d)', value: analytics.totalPointsRedeemed.toLocaleString(), color: 'text-green-400' },
-                    { label: 'Redemptions (30d)', value: analytics.totalRedemptions.toLocaleString(), color: 'text-blue-400' },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="bg-[#16162a] border border-white/10 rounded-xl p-4 text-center">
+                    { label: 'Total Members', value: analytics.totalCustomers.toLocaleString(), color: 'text-purple-400', dt: null },
+                    { label: 'Points Issued (30d)', value: analytics.totalPointsIssued.toLocaleString(), color: 'text-yellow-400', dt: 'points' },
+                    { label: 'Points Redeemed (30d)', value: analytics.totalPointsRedeemed.toLocaleString(), color: 'text-green-400', dt: null },
+                    { label: 'Redemptions (30d)', value: analytics.totalRedemptions.toLocaleString(), color: 'text-blue-400', dt: 'redemptions' },
+                  ].map(({ label, value, color, dt }) => (
+                    <div key={label} onClick={() => dt && openDrawer(dt)} className={`bg-[#16162a] border border-white/10 rounded-xl p-4 text-center ${dt ? 'cursor-pointer hover:border-white/30 transition' : ''}`}>
                       <div className={`text-2xl font-bold ${color}`}>{value}</div>
                       <div className="text-xs text-gray-500 mt-1">{label}</div>
+                      {dt && <div className="text-xs text-gray-600 mt-1">View details →</div>}
                     </div>
                   ))}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <BarChart title="Points Issued — Last 14 Days" data={analytics.pointsChart} color="#a78bfa" />
-                  <BarChart title="New Signups — Last 14 Days" data={analytics.signupsChart} color="#fbbf24" />
+                  <BarChart title="New Signups — Last 14 Days" data={analytics.signupsChart} color="#fbbf24" onSeeAll={() => openDrawer('signups')} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,7 +202,10 @@ function MerchantDashboardInner() {
                   </div>
 
                   <div className="bg-[#16162a] border border-white/10 rounded-xl p-4">
-                    <div className="text-sm font-semibold text-gray-300 mb-3">Recent Activity</div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-sm font-semibold text-gray-300">Recent Activity</div>
+                      <button onClick={() => openDrawer('activity')} className="text-xs text-gray-500 hover:text-white transition">See all →</button>
+                    </div>
                     <div className="space-y-2">
                       {analytics.recentActivity.length === 0 ? (
                         <p className="text-xs text-gray-600">No activity yet.</p>
@@ -363,6 +379,74 @@ function MerchantDashboardInner() {
           </div>
         )}
       </main>
+
+      {/* Detail Drawer */}
+      {drawer.type && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={closeDrawer} />
+          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+              <div className="font-semibold text-white">
+                {drawer.type === 'points' && 'Points Issued — Last 30 Days'}
+                {drawer.type === 'redemptions' && 'Redemptions — Last 30 Days'}
+                {drawer.type === 'signups' && 'New Signups — Last 14 Days'}
+                {drawer.type === 'activity' && 'All Recent Activity'}
+              </div>
+              <button onClick={closeDrawer} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6">
+              {drawer.loading ? (
+                <p className="text-gray-500 text-sm py-8 text-center">Loading...</p>
+              ) : drawer.data.length === 0 ? (
+                <p className="text-gray-600 text-sm py-8 text-center">No data yet.</p>
+              ) : (drawer.type === 'points' || drawer.type === 'activity') ? (
+                drawer.data.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
+                    <div className="min-w-0">
+                      <div className="text-sm text-white truncate">{item.customerName}</div>
+                      <div className="text-xs text-gray-500 truncate">{item.description || item.type} · {new Date(item.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div className={`text-sm font-bold shrink-0 ml-3 ${item.points > 0 ? 'text-yellow-400' : 'text-red-400'}`}>{item.points > 0 ? '+' : ''}{item.points} pts</div>
+                  </div>
+                ))
+              ) : drawer.type === 'redemptions' ? (
+                drawer.data.map((item: any, i: number) => (
+                  <div key={i} className="py-3 border-b border-white/5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm text-white truncate">{item.customerName}</div>
+                        <div className="text-xs text-gray-500 truncate">{item.customerEmail}</div>
+                        <div className="text-xs text-purple-400 mt-1">{item.offerName} · {item.pointsRequired} pts</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div
+                          className="text-xs font-mono text-green-400 bg-green-900/30 px-2 py-1 rounded cursor-pointer hover:bg-green-900/50 transition"
+                          onClick={() => navigator.clipboard.writeText(item.discount_code)}
+                          title="Click to copy"
+                        >{item.discount_code}</div>
+                        <div className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : drawer.type === 'signups' ? (
+                drawer.data.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
+                    <div className="min-w-0">
+                      <div className="text-sm text-white truncate">{item.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{item.email}</div>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : item.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{item.tier}</span>
+                      <div className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                ))
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
