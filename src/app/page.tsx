@@ -15,12 +15,24 @@ export default function Home() {
   const [mPassword, setMPassword] = useState('')
   const [mLoading, setMLoading] = useState(false)
   const [mError, setMError] = useState('')
+  const [showForgot, setShowForgot] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotLoading, setForgotLoading] = useState(false)
   const [cEmail, setCEmail] = useState('')
   const [cPassword, setCPassword] = useState('')
   const [cLoading, setCLoading] = useState(false)
   const [cError, setCError] = useState('')
   const [stores, setStores] = useState<Store[]>([])
   const router = useRouter()
+
+  async function forgotPassword() {
+    if (!forgotEmail) return
+    setForgotLoading(true)
+    await fetch('/api/merchant/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: forgotEmail }) })
+    setForgotLoading(false)
+    setForgotSent(true)
+  }
 
   async function merchantLogin() {
     if (!mEmail || !mPassword) { setMError('Please enter your email and password.'); return }
@@ -77,6 +89,26 @@ export default function Home() {
             <button onClick={merchantLogin} disabled={mLoading} className="w-full bg-gradient-to-r from-purple-700 to-purple-500 py-3 rounded-xl font-semibold text-sm hover:opacity-90 transition disabled:opacity-50">
               {mLoading ? 'Logging in...' : 'Log In →'}
             </button>
+            <div className="text-center">
+              <button onClick={() => { setShowForgot(p => !p); setForgotSent(false) }} className="text-xs text-gray-500 hover:text-gray-300 underline transition">
+                Forgot password?
+              </button>
+            </div>
+            {showForgot && (
+              <div className="bg-[#0f0f1a] border border-white/10 rounded-xl p-4">
+                {forgotSent ? (
+                  <p className="text-green-400 text-xs text-center">Check your email for a reset link!</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-400 mb-2">Enter your email and we&apos;ll send a reset link.</p>
+                    <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="you@store.com" onKeyDown={e => e.key === 'Enter' && forgotPassword()} className="w-full bg-[#16162a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-purple-500 mb-2" />
+                    <button onClick={forgotPassword} disabled={forgotLoading} className="w-full bg-purple-700 hover:bg-purple-600 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50">
+                      {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             <p className="text-xs text-gray-600 text-center">Don&apos;t have an account? Contact us to get started.</p>
           </div>
         )}
