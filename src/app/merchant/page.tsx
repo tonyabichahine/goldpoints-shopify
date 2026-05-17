@@ -4,6 +4,31 @@ import { useRouter } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
+interface Analytics {
+  totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
+  pointsChart: { date: string; value: number }[]; signupsChart: { date: string; value: number }[]
+  topCustomers: { name: string; email: string; points: number; tier: string }[]
+  recentActivity: { points: number; type: string; description: string; created_at: string; customerName: string }[]
+}
+
+function BarChart({ title, data, color }: { title: string; data: { date: string; value: number }[]; color: string }) {
+  const max = Math.max(...data.map(d => d.value), 1)
+  return (
+    <div className="bg-[#16162a] border border-white/10 rounded-xl p-4">
+      <div className="text-sm font-semibold text-gray-300 mb-3">{title}</div>
+      <div className="flex items-end gap-0.5" style={{ height: '80px' }}>
+        {data.map(d => (
+          <div key={d.date} className="flex-1 rounded-t-sm" style={{ height: `${(d.value / max) * 80}px`, backgroundColor: color, minHeight: d.value > 0 ? '2px' : '0px' }} />
+        ))}
+      </div>
+      <div className="flex gap-0.5 mt-1">
+        {data.map(d => (
+          <div key={d.date} className="flex-1 text-center truncate" style={{ fontSize: '8px', color: '#4b5563' }}>{d.date}</div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function MerchantDashboardInner() {
   const router = useRouter()
@@ -20,6 +45,8 @@ function MerchantDashboardInner() {
   const [newPw, setNewPw] = useState('')
   const [pwMsg, setPwMsg] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   useEffect(() => {
     fetch('/api/merchant/me')
@@ -30,6 +57,7 @@ function MerchantDashboardInner() {
   useEffect(() => {
     if (tab === 'customers') loadCustomers()
     if (tab === 'offers') loadOffers()
+    if (tab === 'overview') loadAnalytics()
   }, [tab])
 
   async function loadCustomers() {
@@ -40,6 +68,13 @@ function MerchantDashboardInner() {
   async function loadOffers() {
     const r = await fetch('/api/merchant/offers')
     setOffers(await r.json())
+  }
+
+  async function loadAnalytics() {
+    setAnalyticsLoading(true)
+    const r = await fetch('/api/merchant/analytics')
+    if (r.ok) setAnalytics(await r.json())
+    setAnalyticsLoading(false)
   }
 
   async function saveSettings() {
@@ -110,20 +145,71 @@ function MerchantDashboardInner() {
 
       <main className="p-8 max-w-5xl mx-auto">
         {tab === 'overview' && (
-          <div>
-            <h2 className="text-2xl font-bold text-purple-400 mb-6">Dashboard</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {[['Points/dollar', merchant.points_per_dollar], ['Signup bonus', merchant.signup_bonus + ' pts'], ['Widget', merchant.widget_title || 'Rewards'], ['Store', merchant.shopify_domain || 'Not connected']].map(([l, v]) => (
-                <div key={l as string} className="bg-[#16162a] border border-white/10 rounded-xl p-4 text-center">
-                  <div className="text-lg font-bold text-purple-400 truncate">{v}</div>
-                  <div className="text-xs text-gray-500 mt-1">{l}</div>
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-purple-400">Dashboard</h2>
+            {analyticsLoading && <p className="text-gray-500 text-sm">Loading analytics...</p>}
+            {analytics && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Total Members', value: analytics.totalCustomers.toLocaleString(), color: 'text-purple-400' },
+                    { label: 'Points Issued (30d)', value: analytics.totalPointsIssued.toLocaleString(), color: 'text-yellow-400' },
+                    { label: 'Points Redeemed (30d)', value: analytics.totalPointsRedeemed.toLocaleString(), color: 'text-green-400' },
+                    { label: 'Redemptions (30d)', value: analytics.totalRedemptions.toLocaleString(), color: 'text-blue-400' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="bg-[#16162a] border border-white/10 rounded-xl p-4 text-center">
+                      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+                      <div className="text-xs text-gray-500 mt-1">{label}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
-              <p className="text-gray-400">Switch to the <strong className="text-white">Customers</strong> tab to see your loyalty members, <strong className="text-white">Offers</strong> to manage rewards, and <strong className="text-white">Widget</strong> to customize your storefront widget.</p>
-              {isConnected && <p className="text-gray-400 mt-3">Go to <strong className="text-white">Install</strong> to get the code snippet to add to your Shopify store.</p>}
-            </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <BarChart title="Points Issued — Last 14 Days" data={analytics.pointsChart} color="#a78bfa" />
+                  <BarChart title="New Signups — Last 14 Days" data={analytics.signupsChart} color="#fbbf24" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-[#16162a] border border-white/10 rounded-xl p-4">
+                    <div className="text-sm font-semibold text-gray-300 mb-3">Top Customers</div>
+                    <div className="space-y-2">
+                      {analytics.topCustomers.length === 0 ? (
+                        <p className="text-xs text-gray-600">No customers yet.</p>
+                      ) : analytics.topCustomers.map((c, i) => (
+                        <div key={c.email} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs text-gray-600 w-4 shrink-0">{i + 1}.</span>
+                            <span className="text-sm text-white truncate">{c.name}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${c.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : c.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{c.tier}</span>
+                          </div>
+                          <span className="text-sm text-purple-400 font-bold shrink-0">{c.points.toLocaleString()} pts</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-[#16162a] border border-white/10 rounded-xl p-4">
+                    <div className="text-sm font-semibold text-gray-300 mb-3">Recent Activity</div>
+                    <div className="space-y-2">
+                      {analytics.recentActivity.length === 0 ? (
+                        <p className="text-xs text-gray-600">No activity yet.</p>
+                      ) : analytics.recentActivity.map((a, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs text-white truncate">{a.customerName}</div>
+                            <div className="text-xs text-gray-500 truncate">{a.description || a.type}</div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className={`text-sm font-bold ${a.points > 0 ? 'text-green-400' : 'text-red-400'}`}>{a.points > 0 ? '+' : ''}{a.points}</div>
+                            <div className="text-xs text-gray-600">{new Date(a.created_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
