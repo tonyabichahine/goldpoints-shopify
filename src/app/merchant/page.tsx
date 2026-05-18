@@ -103,13 +103,28 @@ function MerchantDashboardInner() {
   async function sendAiMessage() {
     const msg = aiChat.input.trim()
     if (!msg || aiChat.loading) return
+
+    // Build context from whatever is currently visible on screen
+    let pageContext = `Merchant is on the "${tab}" tab.`
+    if (tab === 'overview' && analytics) {
+      pageContext += ` They can see: ${analytics.totalCustomers} total members, ${analytics.totalPointsIssued.toLocaleString()} pts issued (30d), ${analytics.totalPointsRedeemed.toLocaleString()} pts redeemed (30d), ${analytics.totalRedemptions} redemptions (30d).`
+      if (analytics.topCustomers.length) pageContext += ` Top customer: ${analytics.topCustomers[0].name} with ${analytics.topCustomers[0].points} pts (${analytics.topCustomers[0].tier}).`
+      if (analytics.recentActivity.length) pageContext += ` Most recent activity: ${analytics.recentActivity[0].customerName} ${analytics.recentActivity[0].points > 0 ? 'earned' : 'redeemed'} ${Math.abs(analytics.recentActivity[0].points)} pts.`
+    } else if (tab === 'customers' && customers.length > 0) {
+      pageContext += ` Viewing ${customers.length} customers. First few: ${customers.slice(0, 3).map(c => `${c.name} (${c.points} pts, ${c.tier})`).join(', ')}.`
+    } else if (tab === 'offers' && offers.length > 0) {
+      pageContext += ` Viewing ${offers.length} offers: ${offers.map((o: any) => `${o.name} (${o.points_required} pts)`).join(', ')}.`
+    } else if (tab === 'widget' && merchant) {
+      pageContext += ` Viewing widget settings: color ${merchant.widget_primary_color}, position ${merchant.widget_position}, ${merchant.points_per_dollar} pts/$1, ${merchant.signup_bonus} pt sign-up bonus.`
+    }
+
     const newMessages: { role: 'user' | 'ai'; content: string }[] = [...aiChat.messages, { role: 'user', content: msg }]
     setAiChat(p => ({ ...p, messages: newMessages, input: '', loading: true }))
     setTimeout(() => aiEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     const r = await fetch('/api/merchant/ai-insights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, history: aiChat.messages }),
+      body: JSON.stringify({ message: msg, history: aiChat.messages, pageContext }),
     })
     const d = r.ok ? await r.json() : { reply: 'Something went wrong. Try again.' }
     setAiChat(p => ({ ...p, messages: [...newMessages, { role: 'ai', content: d.reply || d.error }], loading: false }))
@@ -187,7 +202,7 @@ function MerchantDashboardInner() {
         </button>
       </nav>
 
-      <main className="p-8 max-w-5xl mx-auto">
+      <main className={`p-8 max-w-5xl mx-auto transition-all duration-300 ${aiChat.open ? 'mr-[420px]' : ''}`}>
         {tab === 'overview' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-purple-400">Dashboard</h2>
@@ -415,8 +430,7 @@ function MerchantDashboardInner() {
       {/* AI Chat Drawer */}
       {aiChat.open && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setAiChat(p => ({ ...p, open: false }))} />
-          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+          <div className="fixed right-0 top-0 h-full w-[420px] bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
             <div className="px-6 py-4 border-b border-white/10 shrink-0 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-purple-400">✦</span>

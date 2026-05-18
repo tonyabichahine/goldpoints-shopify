@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
   const merchantId = req.cookies.get('merchant_session')?.value
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-  const { message, history = [] } = await req.json()
+  const { message, history = [], pageContext = '' } = await req.json()
   if (!message) return NextResponse.json({ error: 'No message' }, { status: 400 })
 
   const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -50,13 +50,15 @@ ${(topCustomers || []).map(c => `- ${c.name}: ${c.points} pts (${c.tier})`).join
 Offers:
 ${(offers || []).map(o => `- ${o.name}: costs ${o.points_required} pts → ${o.offer_type === 'shipping' ? 'Free shipping' : `${o.offer_value}${o.offer_type === 'percentage' ? '%' : '$'} off`} (${o.active ? 'active' : 'inactive'})`).join('\n') || 'No offers set up yet.'}`
 
+  const fullSystemPrompt = systemPrompt + (pageContext ? `\n\nWhat the merchant is currently looking at on their screen:\n${pageContext}` : '')
+
   const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: fullSystemPrompt },
         ...history.map((m: any) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
         { role: 'user', content: message },
       ],
