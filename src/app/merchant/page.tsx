@@ -51,6 +51,7 @@ function MerchantDashboardInner() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
+  const [aiInsights, setAiInsights] = useState<{ open: boolean; insights: string[]; loading: boolean; generatedAt: string }>({ open: false, insights: [], loading: false, generatedAt: '' })
 
   useEffect(() => {
     fetch('/api/merchant/me')
@@ -97,6 +98,17 @@ function MerchantDashboardInner() {
   }
 
   function closeDrawer() { setDrawer({ type: null, data: [], loading: false, period: '30' }) }
+
+  async function openAiInsights() {
+    setAiInsights({ open: true, insights: [], loading: true, generatedAt: '' })
+    const r = await fetch('/api/merchant/ai-insights')
+    if (r.ok) {
+      const d = await r.json()
+      setAiInsights({ open: true, insights: d.insights || [], loading: false, generatedAt: d.generatedAt })
+    } else {
+      setAiInsights({ open: true, insights: ['Unable to generate insights right now. Try again.'], loading: false, generatedAt: '' })
+    }
+  }
 
   async function saveSettings() {
     if (!merchant) return
@@ -167,7 +179,12 @@ function MerchantDashboardInner() {
       <main className="p-8 max-w-5xl mx-auto">
         {tab === 'overview' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-purple-400">Dashboard</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-purple-400">Dashboard</h2>
+              <button onClick={openAiInsights} className="flex items-center gap-2 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-xl text-sm font-semibold transition">
+                <span>✦</span> AI Insights
+              </button>
+            </div>
             {analyticsLoading && <p className="text-gray-500 text-sm">Loading analytics...</p>}
             {analytics && (
               <>
@@ -388,6 +405,42 @@ function MerchantDashboardInner() {
           </div>
         )}
       </main>
+
+      {/* AI Insights Drawer */}
+      {aiInsights.open && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setAiInsights(p => ({ ...p, open: false }))} />
+          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+            <div className="px-6 pt-4 pb-3 border-b border-white/10 shrink-0 flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-white flex items-center gap-2"><span>✦</span> AI Insights</div>
+                {aiInsights.generatedAt && <div className="text-xs text-gray-600 mt-0.5">Generated {new Date(aiInsights.generatedAt).toLocaleTimeString()}</div>}
+              </div>
+              <div className="flex items-center gap-2">
+                {!aiInsights.loading && <button onClick={openAiInsights} className="text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:border-white/30">Regenerate</button>}
+                <button onClick={() => setAiInsights(p => ({ ...p, open: false }))} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {aiInsights.loading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="text-2xl animate-pulse">✦</div>
+                  <p className="text-gray-500 text-sm">Analyzing your store data...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {aiInsights.insights.map((insight, i) => (
+                    <div key={i} className="flex gap-3 bg-[#0f0f1a] rounded-xl p-4 border border-white/5">
+                      <span className="text-purple-400 font-bold shrink-0 mt-0.5">•</span>
+                      <p className="text-sm text-gray-200 leading-relaxed">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Detail Drawer */}
       {drawer.type && (() => {
