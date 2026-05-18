@@ -59,13 +59,15 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'signups') {
-    const { data } = await supabaseAdmin
+    const signupSince = since ?? since14
+    let q = supabaseAdmin
       .from('customers')
       .select('name, email, tier, points, created_at')
       .eq('merchant_id', merchantId)
-      .gte('created_at', since14)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(100)
+    if (signupSince) q = q.gte('created_at', signupSince)
+    const { data } = await q
     return NextResponse.json(data || [])
   }
 

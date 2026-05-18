@@ -397,7 +397,7 @@ function MerchantDashboardInner() {
           redeem: 'Redemption', deduct_cancel: 'Order cancelled',
         }
         const PERIODS = [{ v: '7', l: '7 days' }, { v: '30', l: '30 days' }, { v: '90', l: '90 days' }, { v: 'all', l: 'All time' }]
-        const hasPeriod = drawer.type === 'points' || drawer.type === 'redemptions' || drawer.type === 'activity'
+        const hasPeriod = drawer.type === 'points' || drawer.type === 'redemptions' || drawer.type === 'activity' || drawer.type === 'signups'
         const totalPts = drawer.type === 'points' ? drawer.data.reduce((s: number, t: any) => s + t.points, 0) : 0
         return (
           <>
@@ -408,7 +408,7 @@ function MerchantDashboardInner() {
                   <div className="font-semibold text-white">
                     {drawer.type === 'points' && 'Points Issued'}
                     {drawer.type === 'redemptions' && 'Redemptions'}
-                    {drawer.type === 'signups' && 'New Signups — Last 14 Days'}
+                    {drawer.type === 'signups' && 'New Signups'}
                     {drawer.type === 'activity' && 'All Activity'}
                   </div>
                   <button onClick={closeDrawer} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
@@ -424,10 +424,20 @@ function MerchantDashboardInner() {
                   </div>
                 )}
               </div>
-              {drawer.type === 'points' && !drawer.loading && drawer.data.length > 0 && (
+              {!drawer.loading && drawer.data.length > 0 && (drawer.type === 'points' || drawer.type === 'signups') && (
                 <div className="px-6 py-3 bg-[#0f0f1a] border-b border-white/5 flex items-center justify-between shrink-0">
-                  <span className="text-xs text-gray-500">{drawer.data.length} transactions</span>
-                  <span className="text-sm font-bold text-yellow-400">+{totalPts.toLocaleString()} pts total</span>
+                  {drawer.type === 'points' && (
+                    <>
+                      <span className="text-xs text-gray-500">{drawer.data.length} transactions</span>
+                      <span className="text-sm font-bold text-yellow-400">+{totalPts.toLocaleString()} pts total</span>
+                    </>
+                  )}
+                  {drawer.type === 'signups' && (
+                    <>
+                      <span className="text-xs text-gray-500">New members</span>
+                      <span className="text-sm font-bold text-purple-400">{drawer.data.length} joined</span>
+                    </>
+                  )}
                 </div>
               )}
               <div className="flex-1 overflow-y-auto px-6">
@@ -469,12 +479,13 @@ function MerchantDashboardInner() {
                   drawer.data.map((item: any, i: number) => (
                     <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
                       <div className="min-w-0">
-                        <div className="text-sm text-white truncate">{item.name}</div>
-                        <div className="text-xs text-gray-500 truncate">{item.email}</div>
+                        <div className="text-sm font-medium text-white truncate">{item.name}</div>
+                        <div className="text-xs text-gray-400 truncate">{item.email}</div>
+                        <div className="text-xs text-gray-600 mt-0.5">{new Date(item.created_at).toLocaleDateString()}</div>
                       </div>
-                      <div className="text-right shrink-0 ml-3">
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : item.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{item.tier}</span>
-                        <div className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</div>
+                      <div className="text-right shrink-0 ml-4">
+                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${item.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : item.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{item.tier}</span>
+                        <div className="text-xs text-purple-400 mt-1">{item.points?.toLocaleString()} pts</div>
                       </div>
                     </div>
                   ))
