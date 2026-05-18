@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
@@ -51,7 +51,8 @@ function MerchantDashboardInner() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
-  const [aiInsights, setAiInsights] = useState<{ open: boolean; insights: string[]; loading: boolean; generatedAt: string }>({ open: false, insights: [], loading: false, generatedAt: '' })
+  const [aiChat, setAiChat] = useState<{ open: boolean; messages: { role: 'user' | 'ai'; content: string }[]; loading: boolean; input: string }>({ open: false, messages: [], loading: false, input: '' })
+  const aiEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch('/api/merchant/me')
@@ -99,15 +100,20 @@ function MerchantDashboardInner() {
 
   function closeDrawer() { setDrawer({ type: null, data: [], loading: false, period: '30' }) }
 
-  async function openAiInsights() {
-    setAiInsights({ open: true, insights: [], loading: true, generatedAt: '' })
-    const r = await fetch('/api/merchant/ai-insights')
-    if (r.ok) {
-      const d = await r.json()
-      setAiInsights({ open: true, insights: d.insights || [], loading: false, generatedAt: d.generatedAt })
-    } else {
-      setAiInsights({ open: true, insights: ['Unable to generate insights right now. Try again.'], loading: false, generatedAt: '' })
-    }
+  async function sendAiMessage() {
+    const msg = aiChat.input.trim()
+    if (!msg || aiChat.loading) return
+    const newMessages: { role: 'user' | 'ai'; content: string }[] = [...aiChat.messages, { role: 'user', content: msg }]
+    setAiChat(p => ({ ...p, messages: newMessages, input: '', loading: true }))
+    setTimeout(() => aiEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    const r = await fetch('/api/merchant/ai-insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, history: aiChat.messages }),
+    })
+    const d = r.ok ? await r.json() : { reply: 'Something went wrong. Try again.' }
+    setAiChat(p => ({ ...p, messages: [...newMessages, { role: 'ai', content: d.reply || d.error }], loading: false }))
+    setTimeout(() => aiEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
   async function saveSettings() {
@@ -170,21 +176,21 @@ function MerchantDashboardInner() {
         </div>
       )}
 
-      <nav className="flex gap-2 px-8 py-3 bg-[#16162a] border-b border-white/10 flex-wrap">
-        {(['overview','customers','offers','widget','install','account'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
-        ))}
+      <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
+        <div className="flex gap-2 flex-wrap">
+          {(['overview','customers','offers','widget','install','account'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
+          ))}
+        </div>
+        <button onClick={() => setAiChat(p => ({ ...p, open: true }))} className="flex items-center gap-1.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-full text-sm font-semibold transition shrink-0 ml-4">
+          <span>✦</span> AI
+        </button>
       </nav>
 
       <main className="p-8 max-w-5xl mx-auto">
         {tab === 'overview' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-purple-400">Dashboard</h2>
-              <button onClick={openAiInsights} className="flex items-center gap-2 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-xl text-sm font-semibold transition">
-                <span>✦</span> AI Insights
-              </button>
-            </div>
+            <h2 className="text-2xl font-bold text-purple-400">Dashboard</h2>
             {analyticsLoading && <p className="text-gray-500 text-sm">Loading analytics...</p>}
             {analytics && (
               <>
@@ -406,37 +412,70 @@ function MerchantDashboardInner() {
         )}
       </main>
 
-      {/* AI Insights Drawer */}
-      {aiInsights.open && (
+      {/* AI Chat Drawer */}
+      {aiChat.open && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setAiInsights(p => ({ ...p, open: false }))} />
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setAiChat(p => ({ ...p, open: false }))} />
           <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
-            <div className="px-6 pt-4 pb-3 border-b border-white/10 shrink-0 flex items-center justify-between">
-              <div>
-                <div className="font-semibold text-white flex items-center gap-2"><span>✦</span> AI Insights</div>
-                {aiInsights.generatedAt && <div className="text-xs text-gray-600 mt-0.5">Generated {new Date(aiInsights.generatedAt).toLocaleTimeString()}</div>}
+            <div className="px-6 py-4 border-b border-white/10 shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-purple-400">✦</span>
+                <div>
+                  <div className="font-semibold text-white text-sm">AI Assistant</div>
+                  <div className="text-xs text-gray-500">Ask anything about your store</div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                {!aiInsights.loading && <button onClick={openAiInsights} className="text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:border-white/30">Regenerate</button>}
-                <button onClick={() => setAiInsights(p => ({ ...p, open: false }))} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+                {aiChat.messages.length > 0 && (
+                  <button onClick={() => setAiChat(p => ({ ...p, messages: [] }))} className="text-xs text-gray-600 hover:text-gray-400 transition">Clear</button>
+                )}
+                <button onClick={() => setAiChat(p => ({ ...p, open: false }))} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {aiInsights.loading ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3">
-                  <div className="text-2xl animate-pulse">✦</div>
-                  <p className="text-gray-500 text-sm">Analyzing your store data...</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {aiInsights.insights.map((insight, i) => (
-                    <div key={i} className="flex gap-3 bg-[#0f0f1a] rounded-xl p-4 border border-white/5">
-                      <span className="text-purple-400 font-bold shrink-0 mt-0.5">•</span>
-                      <p className="text-sm text-gray-200 leading-relaxed">{insight}</p>
-                    </div>
-                  ))}
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              {aiChat.messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full gap-4 py-8">
+                  <div className="text-3xl text-purple-400/50">✦</div>
+                  <p className="text-gray-500 text-sm text-center px-4">Ask me anything — insights, what to improve, how your top customers are doing, whether your offers are working...</p>
+                  <div className="flex flex-col gap-2 w-full mt-2">
+                    {['Give me insights on my store', 'How is my redemption rate?', 'Who are my best customers?', 'What should I improve?'].map(q => (
+                      <button key={q} onClick={() => setAiChat(p => ({ ...p, input: q }))} className="text-xs text-left bg-[#0f0f1a] border border-white/10 hover:border-purple-500/50 text-gray-400 hover:text-white px-3 py-2 rounded-lg transition">{q}</button>
+                    ))}
+                  </div>
                 </div>
               )}
+              {aiChat.messages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-[#0f0f1a] border border-white/10 text-gray-200 rounded-bl-sm'}`}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {aiChat.loading && (
+                <div className="flex justify-start">
+                  <div className="bg-[#0f0f1a] border border-white/10 px-4 py-2.5 rounded-2xl rounded-bl-sm">
+                    <span className="text-purple-400 animate-pulse text-sm">✦ thinking...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={aiEndRef} />
+            </div>
+
+            <div className="px-4 py-3 border-t border-white/10 shrink-0">
+              <div className="flex gap-2 items-end">
+                <textarea
+                  value={aiChat.input}
+                  onChange={e => setAiChat(p => ({ ...p, input: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage() } }}
+                  placeholder="Ask about your store..."
+                  rows={1}
+                  className="flex-1 bg-[#0f0f1a] border border-white/10 focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 outline-none resize-none"
+                />
+                <button onClick={sendAiMessage} disabled={aiChat.loading || !aiChat.input.trim()} className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 px-4 py-2 rounded-xl text-sm font-semibold transition shrink-0">
+                  Send
+                </button>
+              </div>
             </div>
           </div>
         </>
