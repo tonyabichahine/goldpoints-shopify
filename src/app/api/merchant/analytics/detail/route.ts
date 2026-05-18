@@ -87,5 +87,41 @@ export async function GET(req: NextRequest) {
     })))
   }
 
+  if (type === 'segment') {
+    const segment = req.nextUrl.searchParams.get('segment')
+    const { data: customers } = await supabaseAdmin
+      .from('customers')
+      .select('id, name, email, points, tier, created_at')
+      .eq('merchant_id', merchantId)
+    const { data: txData } = await supabaseAdmin
+      .from('point_transactions')
+      .select('customer_id, created_at')
+      .eq('merchant_id', merchantId)
+      .in('type', ['earn_order', 'earn_purchase'])
+      .order('created_at', { ascending: false })
+      .limit(5000)
+    const lastPurchase: Record<string, string> = {}
+    for (const tx of txData || []) {
+      if (!(tx.customer_id in lastPurchase)) lastPurchase[tx.customer_id] = tx.created_at
+    }
+    const now = Date.now()
+    const result = (customers || []).filter(c => {
+      const last = lastPurchase[c.id]
+      if (!last) return segment === 'never'
+      const days = (now - new Date(last).getTime()) / 86400000
+      if (segment === 'active')  return days <= 30
+      if (segment === 'atRisk')  return days > 30  && days <= 60
+      if (segment === 'dormant') return days > 60  && days <= 90
+      if (segment === 'lapsing') return days > 90  && days <= 180
+      if (segment === 'lost')    return days > 180
+      return false
+    }).map(c => ({
+      ...c,
+      lastPurchase: lastPurchase[c.id] || null,
+      daysSince: lastPurchase[c.id] ? Math.floor((now - new Date(lastPurchase[c.id]).getTime()) / 86400000) : null,
+    })).sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999))
+    return NextResponse.json(result)
+  }
+
   return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
 }

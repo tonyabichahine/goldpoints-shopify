@@ -11,6 +11,38 @@ interface Analytics {
   recentActivity: { points: number; type: string; description: string; created_at: string; customerName: string }[]
 }
 
+const SEGMENT_CONFIG = [
+  { key: 'active',  label: 'Active',          days: '≤ 30 days',   color: '#4ade80' },
+  { key: 'atRisk',  label: 'At Risk',          days: '31–60 days',  color: '#facc15' },
+  { key: 'dormant', label: 'Dormant',          days: '61–90 days',  color: '#fb923c' },
+  { key: 'lapsing', label: 'Lapsing',          days: '91–180 days', color: '#f87171' },
+  { key: 'lost',    label: 'Lost',             days: '180+ days',   color: '#6b7280' },
+  { key: 'never',   label: 'Never Purchased',  days: 'No purchase', color: '#a78bfa' },
+]
+
+// Pure CSS conic-gradient donut chart
+function DonutChart({ segments, total }: { segments: any; total: number }) {
+  if (!total) return <div className="w-36 h-36 rounded-full bg-white/5 flex items-center justify-center text-gray-600 text-xs">No data</div>
+  let angle = 0
+  const slices = SEGMENT_CONFIG.map(s => {
+    const seg = segments[s.key]
+    const pct = seg?.count ? seg.count / total : 0
+    const start = angle
+    angle += pct * 360
+    return { ...s, pct, start, end: angle }
+  }).filter(s => s.pct > 0)
+  const gradient = slices.map(s => `${s.color} ${s.start.toFixed(1)}deg ${s.end.toFixed(1)}deg`).join(', ')
+  return (
+    <div className="relative w-36 h-36 shrink-0">
+      <div className="w-36 h-36 rounded-full" style={{ background: `conic-gradient(${gradient})` }} />
+      <div className="absolute inset-[22px] rounded-full bg-[#16162a] flex flex-col items-center justify-center">
+        <div className="text-lg font-bold text-white">{total}</div>
+        <div className="text-[9px] text-gray-500 leading-tight text-center">members</div>
+      </div>
+    </div>
+  )
+}
+
 function BarChart({ title, data, color, onSeeAll }: { title: string; data: { date: string; value: number }[]; color: string; onSeeAll?: () => void }) {
   const max = Math.max(...data.map(d => d.value), 1)
   return (
@@ -51,6 +83,7 @@ function MerchantDashboardInner() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
+  const [segments, setSegments] = useState<any>(null)
   const [aiChat, setAiChat] = useState<{ open: boolean; messages: { role: 'user' | 'ai'; content: string }[]; loading: boolean; input: string }>({ open: false, messages: [], loading: false, input: '' })
   const aiEndRef = useRef<HTMLDivElement>(null)
 
@@ -78,19 +111,26 @@ function MerchantDashboardInner() {
 
   async function loadAnalytics() {
     setAnalyticsLoading(true)
-    const r = await fetch('/api/merchant/analytics')
-    if (r.ok) setAnalytics(await r.json())
+    const [ar, sr] = await Promise.all([
+      fetch('/api/merchant/analytics'),
+      fetch('/api/merchant/analytics/segments'),
+    ])
+    if (ar.ok) setAnalytics(await ar.json())
+    if (sr.ok) setSegments(await sr.json())
     setAnalyticsLoading(false)
   }
 
   async function openDrawer(type: string, period = '30') {
     setDrawer({ type, data: [], loading: true, period })
-    const r = await fetch(`/api/merchant/analytics/detail?type=${type}&period=${period}`)
+    const url = type.startsWith('segment:')
+      ? `/api/merchant/analytics/detail?type=segment&segment=${type.slice(8)}`
+      : `/api/merchant/analytics/detail?type=${type}&period=${period}`
+    const r = await fetch(url)
     setDrawer({ type, data: r.ok ? await r.json() : [], loading: false, period })
   }
 
   async function changeDrawerPeriod(period: string) {
-    if (!drawer.type) return
+    if (!drawer.type || drawer.type.startsWith('segment:')) return
     const type = drawer.type
     setDrawer(prev => ({ ...prev, data: [], loading: true, period }))
     const r = await fetch(`/api/merchant/analytics/detail?type=${type}&period=${period}`)
@@ -271,6 +311,36 @@ function MerchantDashboardInner() {
                     </div>
                   </div>
                 </div>
+                {/* Customer Health */}
+                {segments && segments.total > 0 && (
+                  <div className="bg-[#16162a] border border-white/10 rounded-xl p-5">
+                    <div className="text-sm font-semibold text-gray-300 mb-5">Customer Health</div>
+                    <div className="flex gap-6 items-center">
+                      <DonutChart segments={segments.segments} total={segments.total} />
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        {SEGMENT_CONFIG.map(s => {
+                          const seg = segments.segments[s.key]
+                          const count = seg?.count || 0
+                          const pct = seg?.pct || 0
+                          return (
+                            <button
+                              key={s.key}
+                              onClick={() => count > 0 && openDrawer(`segment:${s.key}`)}
+                              className={`text-left px-3 py-2 rounded-xl border transition ${count > 0 ? 'border-white/10 hover:border-white/25 cursor-pointer' : 'border-white/5 opacity-40 cursor-default'} bg-[#0f0f1a]`}
+                            >
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                                <span className="text-xs text-gray-400 truncate">{s.label}</span>
+                              </div>
+                              <div className="text-base font-bold text-white">{count} <span className="text-xs font-normal text-gray-600">({pct}%)</span></div>
+                              <div className="text-[10px] text-gray-600 mt-0.5">{s.days}</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -516,6 +586,7 @@ function MerchantDashboardInner() {
                     {drawer.type === 'redemptions' && 'Redemptions'}
                     {drawer.type === 'signups' && 'New Signups'}
                     {drawer.type === 'activity' && 'All Activity'}
+                    {drawer.type?.startsWith('segment:') && (() => { const s = SEGMENT_CONFIG.find(x => x.key === drawer.type!.slice(8)); return s ? `${s.label} Customers` : 'Customers' })()}
                   </div>
                   <button onClick={closeDrawer} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
                 </div>
@@ -530,20 +601,11 @@ function MerchantDashboardInner() {
                   </div>
                 )}
               </div>
-              {!drawer.loading && drawer.data.length > 0 && (drawer.type === 'points' || drawer.type === 'signups') && (
+              {!drawer.loading && drawer.data.length > 0 && (drawer.type === 'points' || drawer.type === 'signups' || drawer.type?.startsWith('segment:')) && (
                 <div className="px-6 py-3 bg-[#0f0f1a] border-b border-white/5 flex items-center justify-between shrink-0">
-                  {drawer.type === 'points' && (
-                    <>
-                      <span className="text-xs text-gray-500">{drawer.data.length} transactions</span>
-                      <span className="text-sm font-bold text-yellow-400">+{totalPts.toLocaleString()} pts total</span>
-                    </>
-                  )}
-                  {drawer.type === 'signups' && (
-                    <>
-                      <span className="text-xs text-gray-500">New members</span>
-                      <span className="text-sm font-bold text-purple-400">{drawer.data.length} joined</span>
-                    </>
-                  )}
+                  {drawer.type === 'points' && (<><span className="text-xs text-gray-500">{drawer.data.length} transactions</span><span className="text-sm font-bold text-yellow-400">+{totalPts.toLocaleString()} pts total</span></>)}
+                  {drawer.type === 'signups' && (<><span className="text-xs text-gray-500">New members</span><span className="text-sm font-bold text-purple-400">{drawer.data.length} joined</span></>)}
+                  {drawer.type?.startsWith('segment:') && (() => { const s = SEGMENT_CONFIG.find(x => x.key === drawer.type!.slice(8)); return (<><span className="text-xs text-gray-500">{s?.label}</span><span className="text-sm font-bold" style={{ color: s?.color }}>{drawer.data.length} customers</span></>); })()}
                 </div>
               )}
               <div className="flex-1 overflow-y-auto px-6">
@@ -595,6 +657,27 @@ function MerchantDashboardInner() {
                       </div>
                     </div>
                   ))
+                ) : drawer.type?.startsWith('segment:') ? (
+                  drawer.data.map((item: any, i: number) => {
+                    const segKey = drawer.type!.slice(8)
+                    const segConf = SEGMENT_CONFIG.find(x => x.key === segKey)
+                    return (
+                      <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-white truncate">{item.name}</div>
+                          <div className="text-xs text-gray-400 truncate">{item.email}</div>
+                          {item.lastPurchase
+                            ? <div className="text-xs text-gray-600 mt-0.5">Last purchase {item.daysSince}d ago · {new Date(item.lastPurchase).toLocaleDateString()}</div>
+                            : <div className="text-xs text-gray-600 mt-0.5">No purchase · joined {new Date(item.created_at).toLocaleDateString()}</div>
+                          }
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${item.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : item.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{item.tier}</span>
+                          <div className="text-xs mt-1 font-semibold" style={{ color: segConf?.color }}>{item.points?.toLocaleString()} pts</div>
+                        </div>
+                      </div>
+                    )
+                  })
                 ) : null}
               </div>
             </div>
