@@ -6,23 +6,31 @@ function pick(row: any) {
   return r ?? {}
 }
 
+function sinceFromPeriod(period: string | null) {
+  if (!period || period === 'all') return null
+  const days = parseInt(period)
+  if (!days) return null
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+}
+
 export async function GET(req: NextRequest) {
   const merchantId = req.cookies.get('merchant_session')?.value
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const type = req.nextUrl.searchParams.get('type')
-  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const since = sinceFromPeriod(req.nextUrl.searchParams.get('period') || '30')
   const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   if (type === 'points') {
-    const { data } = await supabaseAdmin
+    let q = supabaseAdmin
       .from('point_transactions')
       .select('points, type, description, created_at, customers(name, email)')
       .eq('merchant_id', merchantId)
       .gt('points', 0)
-      .gte('created_at', since30)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(100)
+    if (since) q = q.gte('created_at', since)
+    const { data } = await q
     return NextResponse.json((data || []).map(t => ({
       points: t.points, type: t.type, description: t.description, created_at: t.created_at,
       customerName: pick(t.customers).name || 'Unknown',
@@ -31,13 +39,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'redemptions') {
-    const { data } = await supabaseAdmin
+    let q = supabaseAdmin
       .from('redemptions')
       .select('discount_code, created_at, customers(name, email), offers(name, points_required, offer_type, offer_value)')
       .eq('merchant_id', merchantId)
-      .gte('created_at', since30)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(100)
+    if (since) q = q.gte('created_at', since)
+    const { data } = await q
     return NextResponse.json((data || []).map(r => ({
       discount_code: r.discount_code, created_at: r.created_at,
       customerName: pick(r.customers).name || 'Unknown',
@@ -61,12 +70,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'activity') {
-    const { data } = await supabaseAdmin
+    let q = supabaseAdmin
       .from('point_transactions')
       .select('points, type, description, created_at, customers(name, email)')
       .eq('merchant_id', merchantId)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(100)
+    if (since) q = q.gte('created_at', since)
+    const { data } = await q
     return NextResponse.json((data || []).map(t => ({
       points: t.points, type: t.type, description: t.description, created_at: t.created_at,
       customerName: pick(t.customers).name || 'Unknown',

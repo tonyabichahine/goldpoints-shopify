@@ -50,7 +50,7 @@ function MerchantDashboardInner() {
   const [pwSaving, setPwSaving] = useState(false)
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
-  const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean }>({ type: null, data: [], loading: false })
+  const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
 
   useEffect(() => {
     fetch('/api/merchant/me')
@@ -81,13 +81,22 @@ function MerchantDashboardInner() {
     setAnalyticsLoading(false)
   }
 
-  async function openDrawer(type: string) {
-    setDrawer({ type, data: [], loading: true })
-    const r = await fetch(`/api/merchant/analytics/detail?type=${type}`)
-    setDrawer({ type, data: r.ok ? await r.json() : [], loading: false })
+  async function openDrawer(type: string, period = '30') {
+    setDrawer({ type, data: [], loading: true, period })
+    const r = await fetch(`/api/merchant/analytics/detail?type=${type}&period=${period}`)
+    setDrawer({ type, data: r.ok ? await r.json() : [], loading: false, period })
   }
 
-  function closeDrawer() { setDrawer({ type: null, data: [], loading: false }) }
+  async function changeDrawerPeriod(period: string) {
+    if (!drawer.type) return
+    const type = drawer.type
+    setDrawer(prev => ({ ...prev, data: [], loading: true, period }))
+    const r = await fetch(`/api/merchant/analytics/detail?type=${type}&period=${period}`)
+    const data = r.ok ? await r.json() : []
+    setDrawer(prev => ({ ...prev, data, loading: false, period }))
+  }
+
+  function closeDrawer() { setDrawer({ type: null, data: [], loading: false, period: '30' }) }
 
   async function saveSettings() {
     if (!merchant) return
@@ -381,72 +390,100 @@ function MerchantDashboardInner() {
       </main>
 
       {/* Detail Drawer */}
-      {drawer.type && (
-        <>
-          <div className="fixed inset-0 bg-black/60 z-40" onClick={closeDrawer} />
-          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
-              <div className="font-semibold text-white">
-                {drawer.type === 'points' && 'Points Issued — Last 30 Days'}
-                {drawer.type === 'redemptions' && 'Redemptions — Last 30 Days'}
-                {drawer.type === 'signups' && 'New Signups — Last 14 Days'}
-                {drawer.type === 'activity' && 'All Recent Activity'}
-              </div>
-              <button onClick={closeDrawer} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6">
-              {drawer.loading ? (
-                <p className="text-gray-500 text-sm py-8 text-center">Loading...</p>
-              ) : drawer.data.length === 0 ? (
-                <p className="text-gray-600 text-sm py-8 text-center">No data yet.</p>
-              ) : (drawer.type === 'points' || drawer.type === 'activity') ? (
-                drawer.data.map((item: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
-                    <div className="min-w-0">
-                      <div className="text-sm text-white truncate">{item.customerName}</div>
-                      <div className="text-xs text-gray-500 truncate">{item.description || item.type} · {new Date(item.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div className={`text-sm font-bold shrink-0 ml-3 ${item.points > 0 ? 'text-yellow-400' : 'text-red-400'}`}>{item.points > 0 ? '+' : ''}{item.points} pts</div>
+      {drawer.type && (() => {
+        const TYPE_LABEL: Record<string, string> = {
+          earn_order: 'Purchase', earn_signup: 'Sign-up bonus', earn_referral: 'Referral',
+          earn_follow: 'Social follow', earn_birthday: 'Birthday bonus',
+          redeem: 'Redemption', deduct_cancel: 'Order cancelled',
+        }
+        const PERIODS = [{ v: '7', l: '7 days' }, { v: '30', l: '30 days' }, { v: '90', l: '90 days' }, { v: 'all', l: 'All time' }]
+        const hasPeriod = drawer.type === 'points' || drawer.type === 'redemptions' || drawer.type === 'activity'
+        const totalPts = drawer.type === 'points' ? drawer.data.reduce((s: number, t: any) => s + t.points, 0) : 0
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-40" onClick={closeDrawer} />
+            <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+              <div className="px-6 pt-4 pb-3 border-b border-white/10 shrink-0">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-semibold text-white">
+                    {drawer.type === 'points' && 'Points Issued'}
+                    {drawer.type === 'redemptions' && 'Redemptions'}
+                    {drawer.type === 'signups' && 'New Signups — Last 14 Days'}
+                    {drawer.type === 'activity' && 'All Activity'}
                   </div>
-                ))
-              ) : drawer.type === 'redemptions' ? (
-                drawer.data.map((item: any, i: number) => (
-                  <div key={i} className="py-3 border-b border-white/5">
-                    <div className="flex items-start justify-between gap-3">
+                  <button onClick={closeDrawer} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+                </div>
+                {hasPeriod && (
+                  <div className="flex gap-1">
+                    {PERIODS.map(p => (
+                      <button key={p.v} onClick={() => changeDrawerPeriod(p.v)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition ${drawer.period === p.v ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:text-white'}`}>
+                        {p.l}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {drawer.type === 'points' && !drawer.loading && drawer.data.length > 0 && (
+                <div className="px-6 py-3 bg-[#0f0f1a] border-b border-white/5 flex items-center justify-between shrink-0">
+                  <span className="text-xs text-gray-500">{drawer.data.length} transactions</span>
+                  <span className="text-sm font-bold text-yellow-400">+{totalPts.toLocaleString()} pts total</span>
+                </div>
+              )}
+              <div className="flex-1 overflow-y-auto px-6">
+                {drawer.loading ? (
+                  <p className="text-gray-500 text-sm py-8 text-center">Loading...</p>
+                ) : drawer.data.length === 0 ? (
+                  <p className="text-gray-600 text-sm py-8 text-center">No data for this period.</p>
+                ) : (drawer.type === 'points' || drawer.type === 'activity') ? (
+                  drawer.data.map((item: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
                       <div className="min-w-0">
                         <div className="text-sm text-white truncate">{item.customerName}</div>
-                        <div className="text-xs text-gray-500 truncate">{item.customerEmail}</div>
-                        <div className="text-xs text-purple-400 mt-1">{item.offerName} · {item.pointsRequired} pts</div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {TYPE_LABEL[item.type] || item.type}{item.description ? ` · ${item.description}` : ''} · {new Date(item.created_at).toLocaleDateString()}
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className={`text-sm font-bold shrink-0 ml-3 ${item.points > 0 ? 'text-yellow-400' : 'text-red-400'}`}>{item.points > 0 ? '+' : ''}{item.points} pts</div>
+                    </div>
+                  ))
+                ) : drawer.type === 'redemptions' ? (
+                  drawer.data.map((item: any, i: number) => (
+                    <div key={i} className="py-3 border-b border-white/5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm text-white truncate">{item.customerName}</div>
+                          <div className="text-xs text-gray-500 truncate">{item.customerEmail}</div>
+                          <div className="text-xs text-purple-400 mt-1">{item.offerName} · {item.pointsRequired} pts spent</div>
+                          <div className="text-xs text-gray-600 mt-0.5">{new Date(item.created_at).toLocaleDateString()}</div>
+                        </div>
                         <div
-                          className="text-xs font-mono text-green-400 bg-green-900/30 px-2 py-1 rounded cursor-pointer hover:bg-green-900/50 transition"
+                          className="text-xs font-mono text-green-400 bg-green-900/30 px-2 py-1 rounded cursor-pointer hover:bg-green-900/50 transition shrink-0"
                           onClick={() => navigator.clipboard.writeText(item.discount_code)}
                           title="Click to copy"
                         >{item.discount_code}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : drawer.type === 'signups' ? (
+                  drawer.data.map((item: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
+                      <div className="min-w-0">
+                        <div className="text-sm text-white truncate">{item.name}</div>
+                        <div className="text-xs text-gray-500 truncate">{item.email}</div>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : item.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{item.tier}</span>
                         <div className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</div>
                       </div>
                     </div>
-                  </div>
-                ))
-              ) : drawer.type === 'signups' ? (
-                drawer.data.map((item: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
-                    <div className="min-w-0">
-                      <div className="text-sm text-white truncate">{item.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{item.email}</div>
-                    </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' : item.tier === 'Silver' ? 'bg-gray-700 text-gray-300' : 'bg-orange-900 text-orange-400'}`}>{item.tier}</span>
-                      <div className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                ))
-              ) : null}
+                  ))
+                ) : null}
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )
+      })()}
     </div>
   )
 }
