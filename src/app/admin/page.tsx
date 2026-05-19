@@ -50,6 +50,7 @@ export default function AdminPage() {
   // Cron state
   const [cronRunning, setCronRunning] = useState(false)
   const [cronResult, setCronResult] = useState('')
+  const [cronStatus, setCronStatus] = useState<{ enabled?: boolean; nextExecution?: number; lastExecution?: number; lastStatus?: number; lastDuration?: number; lastHttpStatus?: number } | null>(null)
 
   // Premium domain drawer state
   const [settingsMerchant, setSettingsMerchant] = useState<Merchant | null>(null)
@@ -59,7 +60,7 @@ export default function AdminPage() {
   const [domainLoading, setDomainLoading] = useState(false)
   const [domainMsg, setDomainMsg] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadCronStatus() }, [])
 
   async function load() {
     setLoading(true)
@@ -163,12 +164,18 @@ export default function AdminPage() {
     load()
   }
 
+  async function loadCronStatus() {
+    const r = await fetch('/api/admin/cron-status')
+    if (r.ok) setCronStatus(await r.json())
+  }
+
   async function runCron() {
     setCronRunning(true); setCronResult('')
     const r = await fetch('/api/admin/run-cron', { method: 'POST' })
     const d = await r.json()
     setCronResult(d.error ? `Error: ${d.error}` : `Done — ${d.processed ?? 0} enrollments processed`)
     setCronRunning(false)
+    loadCronStatus()
   }
 
   if (loading) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>
@@ -204,12 +211,39 @@ export default function AdminPage() {
         <div className="bg-[#16162a] border border-white/10 rounded-xl p-5 mb-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm mb-1">Automation Cron</div>
-              <p className="text-xs text-gray-500 mb-2">Vercel Hobby runs this once per day. For hourly execution, add the URL below to <a href="https://cron-job.org" target="_blank" className="text-purple-400 hover:underline">cron-job.org</a> (free) set to every hour.</p>
-              <div className="bg-[#0f0f1a] rounded-lg px-3 py-2 text-xs font-mono text-gray-400 break-all">
-                https://goldpoints-shopify.vercel.app/api/cron/automations?secret=<span className="text-yellow-400">YOUR_CRON_SECRET</span>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="font-semibold text-sm">Automation Cron</div>
+                {cronStatus && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${cronStatus.enabled ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
+                    {cronStatus.enabled ? '● Hourly' : '○ Paused'}
+                  </span>
+                )}
               </div>
-              {cronResult && <p className={`text-xs mt-2 ${cronResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{cronResult}</p>}
+              {cronStatus ? (
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <div className="bg-[#0f0f1a] rounded-lg px-3 py-2 text-center">
+                    <div className={`text-sm font-bold ${cronStatus.lastStatus === 1 ? 'text-green-400' : cronStatus.lastStatus === 0 && cronStatus.lastExecution === 0 ? 'text-gray-500' : 'text-red-400'}`}>
+                      {cronStatus.lastStatus === 1 ? '✓ OK' : cronStatus.lastExecution === 0 ? 'Never ran' : '✗ Failed'}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5">Last result</div>
+                  </div>
+                  <div className="bg-[#0f0f1a] rounded-lg px-3 py-2 text-center">
+                    <div className="text-sm font-bold text-gray-300">
+                      {cronStatus.lastExecution ? new Date(cronStatus.lastExecution * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5">Last ran</div>
+                  </div>
+                  <div className="bg-[#0f0f1a] rounded-lg px-3 py-2 text-center">
+                    <div className="text-sm font-bold text-gray-300">
+                      {cronStatus.nextExecution ? new Date(cronStatus.nextExecution * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5">Next run</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mb-2">Loading cron status...</p>
+              )}
+              {cronResult && <p className={`text-xs ${cronResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{cronResult}</p>}
             </div>
             <button onClick={runCron} disabled={cronRunning} className="shrink-0 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-lg transition">
               {cronRunning ? 'Running...' : 'Run Now'}
