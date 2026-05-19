@@ -48,6 +48,18 @@ function buildDefaultFlows(merchantId: string) {
       ],
     },
     {
+      merchant_id: merchantId, name: 'Birthday Reward', trigger: 'birthday', active: true, allow_reenroll: true,
+      nodes: [
+        { id: 'trigger-1', type: 'trigger', position: { x: 250, y: 50 }, data: { triggerType: 'birthday' } },
+        { id: 'email-1', type: 'email', position: { x: 250, y: 180 }, data: { subject: 'Happy Birthday from {{store}}! 🎂', body: 'Hi {{name}},\n\nHappy Birthday from everyone at {{store}}! 🎂\n\nTo celebrate your special day, you\'ve received a birthday bonus — you now have {{points}} points ready to spend. Treat yourself to something you\'ve been eyeing!\n\nAs one of our {{tier}} members, you mean a lot to us. We hope you have a wonderful day, {{name}}.\n\nCome celebrate with us:' } },
+        { id: 'end-1', type: 'end', position: { x: 250, y: 320 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 'trigger-1', target: 'email-1' },
+        { id: 'e2', source: 'email-1', target: 'end-1' },
+      ],
+    },
+    {
       merchant_id: merchantId, name: 'Gold VIP Welcome', trigger: 'tier_gold', active: true, allow_reenroll: false,
       nodes: [
         { id: 'trigger-1', type: 'trigger', position: { x: 250, y: 50 }, data: { triggerType: 'tier_gold' } },

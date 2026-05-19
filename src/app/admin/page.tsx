@@ -51,6 +51,8 @@ export default function AdminPage() {
   const [cronRunning, setCronRunning] = useState(false)
   const [cronResult, setCronResult] = useState('')
   const [cronStatus, setCronStatus] = useState<{ enabled?: boolean; nextExecution?: number; lastExecution?: number; lastStatus?: number; lastDuration?: number; lastHttpStatus?: number } | null>(null)
+  const [enrollmentStats, setEnrollmentStats] = useState<{ errorCount: number; activeCount: number } | null>(null)
+  const [resettingErrors, setResettingErrors] = useState(false)
 
   // Premium domain drawer state
   const [settingsMerchant, setSettingsMerchant] = useState<Merchant | null>(null)
@@ -60,7 +62,7 @@ export default function AdminPage() {
   const [domainLoading, setDomainLoading] = useState(false)
   const [domainMsg, setDomainMsg] = useState('')
 
-  useEffect(() => { load(); loadCronStatus() }, [])
+  useEffect(() => { load(); loadCronStatus(); loadEnrollmentStats() }, [])
 
   async function load() {
     setLoading(true)
@@ -169,13 +171,25 @@ export default function AdminPage() {
     if (r.ok) setCronStatus(await r.json())
   }
 
+  async function loadEnrollmentStats() {
+    const r = await fetch('/api/admin/enrollments')
+    if (r.ok) setEnrollmentStats(await r.json())
+  }
+
   async function runCron() {
     setCronRunning(true); setCronResult('')
     const r = await fetch('/api/admin/run-cron', { method: 'POST' })
     const d = await r.json()
     setCronResult(d.error ? `Error: ${d.error}` : `Done — ${d.processed ?? 0} enrollments processed`)
     setCronRunning(false)
-    loadCronStatus()
+    loadCronStatus(); loadEnrollmentStats()
+  }
+
+  async function resetErrors() {
+    setResettingErrors(true)
+    await fetch('/api/admin/enrollments', { method: 'PATCH' })
+    setResettingErrors(false)
+    loadEnrollmentStats()
   }
 
   if (loading) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>
@@ -243,7 +257,20 @@ export default function AdminPage() {
               ) : (
                 <p className="text-xs text-gray-500 mb-2">Loading cron status...</p>
               )}
-              {cronResult && <p className={`text-xs ${cronResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{cronResult}</p>}
+              {enrollmentStats && (
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs text-gray-500">{enrollmentStats.activeCount} active enrollments</span>
+                  {enrollmentStats.errorCount > 0 && (
+                    <>
+                      <span className="text-xs text-red-400 font-semibold">{enrollmentStats.errorCount} stuck (errored)</span>
+                      <button onClick={resetErrors} disabled={resettingErrors} className="text-xs px-2 py-0.5 rounded border border-red-500/50 text-red-400 hover:bg-red-500/10 transition disabled:opacity-40">
+                        {resettingErrors ? '...' : 'Reset'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {cronResult && <p className={`text-xs mt-1 ${cronResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{cronResult}</p>}
             </div>
             <button onClick={runCron} disabled={cronRunning} className="shrink-0 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-lg transition">
               {cronRunning ? 'Running...' : 'Run Now'}

@@ -10,6 +10,13 @@ function getMerchantId(req: NextRequest) {
   return req.cookies.get('merchant_session')?.value || null
 }
 
+async function getCancelledOrderIds(merchantId: string): Promise<Set<string>> {
+  const { data } = await supabaseAdmin
+    .from('point_transactions').select('shopify_order_id')
+    .eq('merchant_id', merchantId).eq('type', 'deduct_cancel').not('shopify_order_id', 'is', null)
+  return new Set((data || []).map((r: any) => r.shopify_order_id).filter(Boolean))
+}
+
 async function getSegmentCustomers(merchantId: string, segment: string): Promise<{ id: string; email: string; name: string; points: number; tier: string }[]> {
   const base = () => supabaseAdmin.from('customers').select('id, email, name, points, tier, marketing_consent').eq('merchant_id', merchantId)
 
@@ -22,14 +29,19 @@ async function getSegmentCustomers(merchantId: string, segment: string): Promise
     return data || []
   }
   if (segment === 'never') {
+    const cancelledIds = await getCancelledOrderIds(merchantId)
     const { data: withPurchase } = await supabaseAdmin
-      .from('point_transactions').select('customer_id').eq('merchant_id', merchantId).in('type', ['earn_purchase', 'earn_order'])
-    const ids = [...new Set((withPurchase || []).map((r: any) => r.customer_id))]
-    if (ids.length === 0) {
+      .from('point_transactions').select('customer_id, shopify_order_id')
+      .eq('merchant_id', merchantId).in('type', ['earn_purchase', 'earn_order'])
+    // Customers with at least one non-cancelled purchase
+    const idsWithRealPurchase = [...new Set(
+      (withPurchase || []).filter((r: any) => !cancelledIds.has(r.shopify_order_id)).map((r: any) => r.customer_id)
+    )]
+    if (idsWithRealPurchase.length === 0) {
       const { data } = await base()
       return data || []
     }
-    const { data } = await base().not('id', 'in', `(${ids.join(',')})`)
+    const { data } = await base().not('id', 'in', `(${idsWithRealPurchase.join(',')})`)
     return data || []
   }
   const dayRanges: Record<string, [number, number]> = {
@@ -38,10 +50,13 @@ async function getSegmentCustomers(merchantId: string, segment: string): Promise
   const [minDays, maxDays] = dayRanges[segment] || [0, 30]
   const from = new Date(Date.now() - maxDays * 86400000).toISOString()
   const to = new Date(Date.now() - minDays * 86400000).toISOString()
+  const cancelledIds = await getCancelledOrderIds(merchantId)
   const { data: txRows } = await supabaseAdmin
-    .from('point_transactions').select('customer_id').eq('merchant_id', merchantId)
+    .from('point_transactions').select('customer_id, shopify_order_id').eq('merchant_id', merchantId)
     .in('type', ['earn_purchase', 'earn_order']).gte('created_at', from).lte('created_at', to)
-  const ids = [...new Set((txRows || []).map((r: any) => r.customer_id))]
+  const ids = [...new Set(
+    (txRows || []).filter((r: any) => !cancelledIds.has(r.shopify_order_id)).map((r: any) => r.customer_id)
+  )]
   if (ids.length === 0) return []
   const { data } = await base().in('id', ids)
   return data || []

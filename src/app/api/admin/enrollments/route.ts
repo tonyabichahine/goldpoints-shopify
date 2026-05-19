@@ -1,0 +1,27 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
+
+function isAdmin(req: NextRequest) {
+  return req.cookies.get('admin_session')?.value === (process.env.ADMIN_PASSWORD || 'admin123')
+}
+
+// GET: counts of errored and active enrollments
+export async function GET(req: NextRequest) {
+  if (!isAdmin(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const [{ count: errorCount }, { count: activeCount }] = await Promise.all([
+    supabaseAdmin.from('automation_enrollments').select('*', { count: 'exact', head: true }).eq('status', 'error'),
+    supabaseAdmin.from('automation_enrollments').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+  ])
+
+  return NextResponse.json({ errorCount: errorCount ?? 0, activeCount: activeCount ?? 0 })
+}
+
+// PATCH: reset all errored enrollments back to active
+export async function PATCH(req: NextRequest) {
+  if (!isAdmin(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  await supabaseAdmin.from('automation_enrollments')
+    .update({ status: 'active', error_count: 0, last_error: null })
+    .eq('status', 'error')
+  return NextResponse.json({ ok: true })
+}
