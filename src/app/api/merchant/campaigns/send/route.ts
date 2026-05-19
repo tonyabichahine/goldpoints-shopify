@@ -58,11 +58,12 @@ export async function POST(req: NextRequest) {
   if (customers.length === 0) return NextResponse.json({ error: 'No customers in this segment' }, { status: 400 })
 
   // Save campaign first so we have an ID for tracked links
-  const { data: campaign } = await supabaseAdmin.from('campaigns')
+  const { data: campaign, error: campaignError } = await supabaseAdmin.from('campaigns')
     .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length })
-    .select().single()
+    .select()
+    .single()
 
-  if (!campaign) return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 })
+  if (!campaign) return NextResponse.json({ error: 'Failed to create campaign', detail: campaignError?.message }, { status: 500 })
 
   await supabaseAdmin.from('campaign_sends').insert(
     customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id }))
@@ -76,5 +77,5 @@ export async function POST(req: NextRequest) {
     await sendCampaignEmailHtml(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain)
   }
 
-  return NextResponse.json({ ok: true, sent: customers.length, campaign: { id: campaign.id } })
+  return NextResponse.json({ ok: true, sent: customers.length, campaign: { ...campaign, attributed_orders: 0, attributed_revenue: 0, link_clicks: 0, revenue_per_email: 0 } })
 }
