@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
-interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; attributed_orders: number; attributed_revenue: number }
+interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number }
 interface Automation { id: string; trigger: string; name: string; subject: string; body: string; active: boolean; created_at: string }
 interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string }
 interface Analytics {
@@ -130,7 +130,7 @@ function MerchantDashboardInner() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
   const [segments, setSegments] = useState<any>(null)
-  const [campaignDetail, setCampaignDetail] = useState<Analytics['recentCampaigns'][0] | null>(null)
+  const [campaignDetail, setCampaignDetail] = useState<Campaign | null>(null)
   const [campaignSort, setCampaignSort] = useState<'recent' | 'revenue_high' | 'revenue_low' | 'clicks'>('recent')
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -155,7 +155,7 @@ function MerchantDashboardInner() {
   useEffect(() => {
     if (tab === 'customers') loadCustomers()
     if (tab === 'offers') loadOffers()
-    if (tab === 'overview') loadAnalytics()
+    if (tab === 'overview') { loadAnalytics(); loadCampaigns() }
     if (tab === 'campaigns') { loadCampaigns(); loadAutomations() }
     if (tab === 'flows') loadFlows()
   }, [tab])
@@ -515,12 +515,12 @@ function MerchantDashboardInner() {
                 )}
 
                 {/* Campaigns */}
-                {(analytics.recentCampaigns?.length ?? 0) > 0 && (() => {
-                  const sorted = [...(analytics.recentCampaigns || [])].sort((a, b) => {
+                {campaigns.length > 0 && (() => {
+                  const sorted = [...campaigns].sort((a, b) => {
                     if (campaignSort === 'revenue_high') return b.attributed_revenue - a.attributed_revenue
                     if (campaignSort === 'revenue_low') return a.attributed_revenue - b.attributed_revenue
                     if (campaignSort === 'clicks') return b.link_clicks - a.link_clicks
-                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    return new Date(b.created_at || b.sent_at || 0).getTime() - new Date(a.created_at || a.sent_at || 0).getTime()
                   })
                   return (
                     <div>
@@ -552,7 +552,7 @@ function MerchantDashboardInner() {
                               <div className="flex items-start justify-between gap-2 mb-3">
                                 <div className="min-w-0">
                                   <div className="text-sm font-semibold text-white truncate group-hover:text-emerald-300 transition">{c.name}</div>
-                                  <div className="text-xs text-gray-500 mt-0.5">{new Date(c.created_at).toLocaleDateString()}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{new Date(c.created_at || c.sent_at).toLocaleDateString()}</div>
                                 </div>
                                 <div className="text-right shrink-0">
                                   <div className="text-lg font-bold text-emerald-400">${c.attributed_revenue.toFixed(2)}</div>
@@ -1070,7 +1070,7 @@ function MerchantDashboardInner() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-white text-base">{c.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Sent {new Date(c.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Sent {new Date(c.created_at || c.sent_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
                   </div>
                   <button onClick={() => setCampaignDetail(null)} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center shrink-0">×</button>
                 </div>
