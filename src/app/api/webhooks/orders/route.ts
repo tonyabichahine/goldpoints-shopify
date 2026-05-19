@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants')
-    .select('id, store_name, shopify_access_token, points_per_dollar, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
+    .select('id, store_name, shopify_access_token, points_per_dollar, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, attribution_window_days')
     .eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ ok: true })
 
@@ -79,24 +79,40 @@ export async function POST(req: NextRequest) {
     tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(() => {})
   }
 
-  // Campaign attribution: if customer received a campaign email in the last 7 days, attribute this order
-  const attributionWindow = new Date(Date.now() - 7 * 86400000).toISOString()
+  // Campaign attribution: click-based first (stronger), then send-based fallback
+  const windowDays = merchant.attribution_window_days ?? 7
+  const attributionWindow = new Date(Date.now() - windowDays * 86400000).toISOString()
   ;(async () => {
     try {
+      // Prefer click attribution (customer clicked a campaign link before ordering)
+      const { data: click } = await supabaseAdmin.from('campaign_clicks')
+        .select('campaign_id')
+        .eq('customer_id', customer.id)
+        .eq('merchant_id', merchant.id)
+        .gte('clicked_at', attributionWindow)
+        .order('clicked_at', { ascending: false })
+        .limit(1).single()
+
+      const campaignId = click?.campaign_id
+      if (campaignId) {
+        await supabaseAdmin.from('campaign_attributions').insert({
+          campaign_id: campaignId, merchant_id: merchant.id, customer_id: customer.id,
+          shopify_order_id: String(order.id), revenue: orderTotal, attributed_via: 'click',
+        })
+        return
+      }
+
+      // Fall back to send-based attribution (received email within window)
       const { data: send } = await supabaseAdmin.from('campaign_sends')
         .select('campaign_id')
         .eq('customer_id', customer.id)
         .gte('sent_at', attributionWindow)
         .order('sent_at', { ascending: false })
-        .limit(1)
-        .single()
+        .limit(1).single()
       if (!send) return
       await supabaseAdmin.from('campaign_attributions').insert({
-        campaign_id: send.campaign_id,
-        merchant_id: merchant.id,
-        customer_id: customer.id,
-        shopify_order_id: String(order.id),
-        revenue: orderTotal,
+        campaign_id: send.campaign_id, merchant_id: merchant.id, customer_id: customer.id,
+        shopify_order_id: String(order.id), revenue: orderTotal, attributed_via: 'send',
       })
     } catch {}
   })()

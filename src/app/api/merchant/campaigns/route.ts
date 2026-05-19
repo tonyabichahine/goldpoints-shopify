@@ -24,11 +24,14 @@ export async function GET(req: NextRequest) {
     attrMap[a.campaign_id].revenue += parseFloat(a.revenue) || 0
   }
 
-  return NextResponse.json(campaigns.map(c => ({
-    ...c,
-    attributed_orders: attrMap[c.id]?.orders || 0,
-    attributed_revenue: attrMap[c.id]?.revenue || 0,
-  })))
+  return NextResponse.json(campaigns.map(c => {
+    const attributed_revenue = attrMap[c.id]?.revenue || 0
+    const attributed_orders = attrMap[c.id]?.orders || 0
+    const revenue_per_email = c.recipient_count > 0
+      ? parseFloat((attributed_revenue / c.recipient_count).toFixed(2))
+      : 0
+    return { ...c, attributed_orders, attributed_revenue, revenue_per_email }
+  }))
 }
 
 export async function DELETE(req: NextRequest) {

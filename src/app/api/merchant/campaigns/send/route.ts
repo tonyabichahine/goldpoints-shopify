@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendEmail } from '@/lib/email'
+import { sendCampaignEmailHtml } from '@/lib/email'
 
 function getMerchantId(req: NextRequest) {
   return req.cookies.get('merchant_session')?.value || null
@@ -50,31 +50,31 @@ export async function POST(req: NextRequest) {
   const { name, subject, emailBody, segment } = await req.json()
   if (!name || !subject || !emailBody) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
-  const { data: merchant } = await supabaseAdmin.from('merchants').select('store_name').eq('id', merchantId).single()
+  const { data: merchant } = await supabaseAdmin.from('merchants').select('store_name, shopify_domain').eq('id', merchantId).single()
   const storeName = merchant?.store_name || 'Our Store'
+  const shopifyDomain = merchant?.shopify_domain || ''
 
   const customers = await getSegmentCustomers(merchantId, segment || 'all')
   if (customers.length === 0) return NextResponse.json({ error: 'No customers in this segment' }, { status: 400 })
 
-  for (const c of customers) {
-    const firstName = (c.name || c.email).split(' ')[0]
-    const sub = (s: string) => s
-      .replace(/\{\{name\}\}/g, firstName)
-      .replace(/\{\{points\}\}/g, String(c.points))
-      .replace(/\{\{tier\}\}/g, c.tier)
-      .replace(/\{\{store\}\}/g, storeName)
-    await sendEmail(c.email, sub(subject), sub(emailBody))
-  }
-
+  // Save campaign first so we have an ID for tracked links
   const { data: campaign } = await supabaseAdmin.from('campaigns')
     .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length })
     .select().single()
 
-  if (campaign?.id && customers.length > 0) {
-    await supabaseAdmin.from('campaign_sends').insert(
-      customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id }))
-    )
+  if (!campaign) return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 })
+
+  await supabaseAdmin.from('campaign_sends').insert(
+    customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id }))
+  )
+
+  for (const c of customers) {
+    const firstName = (c.name || c.email).split(' ')[0]
+    const sub = (s: string) => s
+      .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
+      .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
+    await sendCampaignEmailHtml(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain)
   }
 
-  return NextResponse.json({ ok: true, sent: customers.length, campaign })
+  return NextResponse.json({ ok: true, sent: customers.length, campaign: { id: campaign.id } })
 }
