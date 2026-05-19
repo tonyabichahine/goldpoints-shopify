@@ -6,7 +6,7 @@ interface Merchant { id: string; store_name: string; shopify_domain: string; sho
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number }
 interface Automation { id: string; trigger: string; name: string; subject: string; body: string; active: boolean; created_at: string }
-interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string }
+interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
   totalPointsLiability: number; campaignRevenue: number; campaignOrders: number
@@ -132,6 +132,7 @@ function MerchantDashboardInner() {
   const [segments, setSegments] = useState<any>(null)
   const [campaignDetail, setCampaignDetail] = useState<Campaign | null>(null)
   const [campaignSort, setCampaignSort] = useState<'recent' | 'revenue_high' | 'revenue_low' | 'clicks'>('recent')
+  const [flowDetail, setFlowDetail] = useState<FlowSummary | null>(null)
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [automations, setAutomations] = useState<Automation[]>([])
@@ -155,7 +156,7 @@ function MerchantDashboardInner() {
   useEffect(() => {
     if (tab === 'customers') loadCustomers()
     if (tab === 'offers') loadOffers()
-    if (tab === 'overview') { loadAnalytics(); loadCampaigns() }
+    if (tab === 'overview') { loadAnalytics(); loadCampaigns(); loadFlows() }
     if (tab === 'campaigns') { loadCampaigns(); loadAutomations() }
     if (tab === 'flows') loadFlows()
   }, [tab])
@@ -563,6 +564,50 @@ function MerchantDashboardInner() {
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">📧 {c.recipient_count.toLocaleString()}</span>
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">👆 {c.link_clicks} · {ctr}%</span>
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">🛒 {c.attributed_orders}</span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Automation Flows */}
+                {flows.length > 0 && (() => {
+                  const TRIGGER_LABELS: Record<string, string> = {
+                    signup: '🎉 New Signup', first_purchase: '🛍️ First Purchase',
+                    tier_silver: '🥈 Reaches Silver', tier_gold: '🥇 Reaches Gold',
+                    inactivity_30: '💤 30-Day Inactive', inactivity_60: '😴 60-Day Inactive',
+                    inactivity_90: '🚨 90-Day Inactive', birthday: '🎂 Birthday',
+                    points_milestone: '⭐ Points Milestone', referral_made: '👥 Referral Made',
+                  }
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-semibold text-gray-300">Automation Flows</div>
+                        <button onClick={() => setTab('flows')} className="text-xs text-gray-500 hover:text-white transition">View all →</button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {flows.map(f => {
+                          const triggerLabels = f.trigger.split(',').map(t => TRIGGER_LABELS[t.trim()] || t.trim())
+                          const completionRate = f.enrolled > 0 ? Math.round((f.completed_enrollments / f.enrolled) * 100) : 0
+                          return (
+                            <button key={f.id} onClick={() => setFlowDetail(f)}
+                              className="bg-[#16162a] border border-white/10 hover:border-purple-500/40 rounded-xl p-4 text-left transition group w-full">
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-white truncate group-hover:text-purple-300 transition">{f.name}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5 truncate">{triggerLabels.join(' · ')}</div>
+                                </div>
+                                <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${f.active ? 'bg-green-900/50 text-green-400' : 'bg-white/5 text-gray-500'}`}>
+                                  {f.active ? 'Active' : 'Draft'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">👥 {f.enrolled} enrolled</span>
+                                <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">⚡ {f.active_enrollments} active</span>
+                                <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">✓ {completionRate}% done</span>
                               </div>
                             </button>
                           )
@@ -1056,6 +1101,63 @@ function MerchantDashboardInner() {
       )}
 
       {/* Detail Drawer */}
+      {/* Flow Detail Drawer */}
+      {flowDetail && (() => {
+        const f = flowDetail
+        const completionRate = f.enrolled > 0 ? ((f.completed_enrollments / f.enrolled) * 100).toFixed(1) : '0.0'
+        const TRIGGER_LABELS: Record<string, string> = {
+          signup: '🎉 New Signup', first_purchase: '🛍️ First Purchase',
+          tier_silver: '🥈 Reaches Silver', tier_gold: '🥇 Reaches Gold',
+          inactivity_30: '💤 30-Day Inactive', inactivity_60: '😴 60-Day Inactive',
+          inactivity_90: '🚨 90-Day Inactive', birthday: '🎂 Birthday',
+          points_milestone: '⭐ Points Milestone', referral_made: '👥 Referral Made',
+        }
+        const triggerLabels = f.trigger.split(',').map(t => TRIGGER_LABELS[t.trim()] || t.trim())
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setFlowDetail(null)} />
+            <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+              <div className="px-6 pt-5 pb-4 border-b border-white/10 shrink-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-white text-base">{f.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{triggerLabels.join(' · ')}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.active ? 'bg-green-900/50 text-green-400' : 'bg-white/5 text-gray-500'}`}>{f.active ? 'Active' : 'Draft'}</span>
+                    <button onClick={() => setFlowDetail(null)} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Total Enrolled', value: f.enrolled.toLocaleString(), icon: '👥', color: 'text-white' },
+                    { label: 'Currently Active', value: f.active_enrollments.toLocaleString(), icon: '⚡', color: 'text-yellow-400' },
+                    { label: 'Completed', value: f.completed_enrollments.toLocaleString(), icon: '✓', color: 'text-green-400' },
+                    { label: 'Completion Rate', value: `${completionRate}%`, icon: '📊', color: 'text-purple-400' },
+                  ].map(stat => (
+                    <div key={stat.label} className="bg-[#0f0f1a] rounded-xl p-4">
+                      <div className="text-lg mb-1">{stat.icon}</div>
+                      <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => { setFlowDetail(null); router.push(`/merchant/flows/${f.id}`) }}
+                  className="w-full text-center text-xs text-gray-500 hover:text-white transition py-2 border border-white/10 hover:border-white/25 rounded-lg">
+                  Open in Flow Builder →
+                </button>
+                <button onClick={() => { setFlowDetail(null); setTab('flows') }}
+                  className="w-full text-center text-xs text-gray-500 hover:text-white transition py-2 border border-white/10 hover:border-white/25 rounded-lg">
+                  Go to Flows tab →
+                </button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
       {/* Campaign Detail Drawer */}
       {campaignDetail && (() => {
         const c = campaignDetail

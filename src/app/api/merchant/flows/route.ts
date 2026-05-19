@@ -23,12 +23,32 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(data)
   }
-  const { data } = await supabaseAdmin
+  const { data: flowList } = await supabaseAdmin
     .from('automation_flows')
     .select('id, name, trigger, active, allow_reenroll, created_at')
     .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
-  return NextResponse.json(data || [])
+  if (!flowList?.length) return NextResponse.json([])
+
+  const { data: enrollments } = await supabaseAdmin
+    .from('automation_enrollments')
+    .select('flow_id, status')
+    .in('flow_id', flowList.map(f => f.id))
+
+  const enrollMap: Record<string, { total: number; active: number; completed: number }> = {}
+  for (const e of enrollments || []) {
+    if (!enrollMap[e.flow_id]) enrollMap[e.flow_id] = { total: 0, active: 0, completed: 0 }
+    enrollMap[e.flow_id].total++
+    if (e.status === 'active') enrollMap[e.flow_id].active++
+    if (e.status === 'completed') enrollMap[e.flow_id].completed++
+  }
+
+  return NextResponse.json(flowList.map(f => ({
+    ...f,
+    enrolled: enrollMap[f.id]?.total || 0,
+    active_enrollments: enrollMap[f.id]?.active || 0,
+    completed_enrollments: enrollMap[f.id]?.completed || 0,
+  })))
 }
 
 export async function POST(req: NextRequest) {
