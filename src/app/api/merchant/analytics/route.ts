@@ -88,12 +88,14 @@ export async function GET(req: NextRequest) {
   let recentCampaignAttribs: { campaign_id: string; revenue: string }[] = []
   let recentCampaignClicks: { campaign_id: string }[] = []
   if (recentCampaignIds.length > 0) {
-    const [{ data: attribData }, { data: clickData }] = await Promise.all([
-      supabaseAdmin.from('campaign_attributions').select('campaign_id, revenue').in('campaign_id', recentCampaignIds),
-      supabaseAdmin.from('campaign_clicks').select('campaign_id').in('campaign_id', recentCampaignIds),
-    ])
-    recentCampaignAttribs = (attribData || []) as { campaign_id: string; revenue: string }[]
-    recentCampaignClicks = (clickData || []) as { campaign_id: string }[]
+    try {
+      const [{ data: attribData }, { data: clickData }] = await Promise.all([
+        supabaseAdmin.from('campaign_attributions').select('campaign_id, revenue').in('campaign_id', recentCampaignIds),
+        supabaseAdmin.from('campaign_clicks').select('campaign_id').in('campaign_id', recentCampaignIds),
+      ])
+      recentCampaignAttribs = (attribData || []) as { campaign_id: string; revenue: string }[]
+      recentCampaignClicks = (clickData || []) as { campaign_id: string }[]
+    } catch {}
   }
   const recentCampaignsWithStats = (recentCampaigns || []).map(c => {
     const attribs = recentCampaignAttribs.filter(a => a.campaign_id === c.id)

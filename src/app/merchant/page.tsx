@@ -515,8 +515,8 @@ function MerchantDashboardInner() {
                 )}
 
                 {/* Campaigns */}
-                {analytics.recentCampaigns.length > 0 && (() => {
-                  const sorted = [...analytics.recentCampaigns].sort((a, b) => {
+                {(analytics.recentCampaigns?.length ?? 0) > 0 && (() => {
+                  const sorted = [...(analytics.recentCampaigns || [])].sort((a, b) => {
                     if (campaignSort === 'revenue_high') return b.attributed_revenue - a.attributed_revenue
                     if (campaignSort === 'revenue_low') return a.attributed_revenue - b.attributed_revenue
                     if (campaignSort === 'clicks') return b.link_clicks - a.link_clicks
