@@ -58,12 +58,17 @@ export async function POST(req: NextRequest) {
   if (customers.length === 0) return NextResponse.json({ error: 'No customers in this segment' }, { status: 400 })
 
   // Save campaign first so we have an ID for tracked links
-  const { data: campaign, error: campaignError } = await supabaseAdmin.from('campaigns')
-    .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length })
-    .select()
-    .single()
-
-  if (!campaign) return NextResponse.json({ error: 'Failed to create campaign', detail: campaignError?.message }, { status: 500 })
+  let campaign: any = null
+  try {
+    const { data, error: insertError } = await supabaseAdmin.from('campaigns')
+      .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length })
+      .select()
+    if (insertError) return NextResponse.json({ error: 'Failed to create campaign', detail: insertError.message }, { status: 500 })
+    campaign = data?.[0]
+  } catch (e: any) {
+    return NextResponse.json({ error: 'Failed to create campaign', detail: e?.message }, { status: 500 })
+  }
+  if (!campaign) return NextResponse.json({ error: 'Campaign insert returned no data' }, { status: 500 })
 
   await supabaseAdmin.from('campaign_sends').insert(
     customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id }))
