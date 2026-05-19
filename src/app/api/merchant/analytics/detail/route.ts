@@ -93,15 +93,14 @@ export async function GET(req: NextRequest) {
       .from('customers')
       .select('id, name, email, points, tier, created_at')
       .eq('merchant_id', merchantId)
-    const { data: txData } = await supabaseAdmin
-      .from('point_transactions')
-      .select('customer_id, created_at')
-      .eq('merchant_id', merchantId)
-      .in('type', ['earn_order', 'earn_purchase'])
-      .order('created_at', { ascending: false })
-      .limit(5000)
+    const [{ data: txData }, { data: cancels }] = await Promise.all([
+      supabaseAdmin.from('point_transactions').select('customer_id, created_at, shopify_order_id').eq('merchant_id', merchantId).in('type', ['earn_order', 'earn_purchase']).order('created_at', { ascending: false }).limit(5000),
+      supabaseAdmin.from('point_transactions').select('shopify_order_id').eq('merchant_id', merchantId).eq('type', 'deduct_cancel').not('shopify_order_id', 'is', null),
+    ])
+    const cancelledIds = new Set((cancels || []).map((c: any) => c.shopify_order_id).filter(Boolean))
     const lastPurchase: Record<string, string> = {}
     for (const tx of txData || []) {
+      if (tx.shopify_order_id && cancelledIds.has(tx.shopify_order_id)) continue
       if (!(tx.customer_id in lastPurchase)) lastPurchase[tx.customer_id] = tx.created_at
     }
     const now = Date.now()

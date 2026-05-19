@@ -12,10 +12,20 @@ export async function GET(req: NextRequest) {
 
   if (!customers?.length) return NextResponse.json({ total: 0, segments: {} })
 
-  // Get last earn_order per customer (order desc, first occurrence = most recent)
+  // Get cancelled order IDs so we can exclude them from "last purchase"
+  const { data: cancels } = await supabaseAdmin
+    .from('point_transactions')
+    .select('shopify_order_id')
+    .eq('merchant_id', merchantId)
+    .eq('type', 'deduct_cancel')
+    .not('shopify_order_id', 'is', null)
+
+  const cancelledIds = new Set((cancels || []).map((c: any) => c.shopify_order_id).filter(Boolean))
+
+  // Get last real (non-cancelled) earn_order per customer
   const { data: txData } = await supabaseAdmin
     .from('point_transactions')
-    .select('customer_id, created_at')
+    .select('customer_id, created_at, shopify_order_id')
     .eq('merchant_id', merchantId)
     .in('type', ['earn_order', 'earn_purchase'])
     .order('created_at', { ascending: false })
@@ -23,6 +33,7 @@ export async function GET(req: NextRequest) {
 
   const lastPurchase: Record<string, number> = {}
   for (const tx of txData || []) {
+    if (tx.shopify_order_id && cancelledIds.has(tx.shopify_order_id)) continue
     if (!(tx.customer_id in lastPurchase)) {
       lastPurchase[tx.customer_id] = new Date(tx.created_at).getTime()
     }
