@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from('customers').select('points, tier').eq('merchant_id', merchantId),
     supabaseAdmin.from('redemptions').select('offer_id, offers(name)').eq('merchant_id', merchantId),
     supabaseAdmin.from('campaign_attributions').select('revenue').eq('merchant_id', merchantId).gte('created_at', since30),
-    supabaseAdmin.from('campaigns').select('id, name, recipient_count, created_at').eq('merchant_id', merchantId).order('created_at', { ascending: false }).limit(4),
+    supabaseAdmin.from('campaigns').select('id, name, recipient_count, created_at').eq('merchant_id', merchantId).order('created_at', { ascending: false }).limit(20),
     supabaseAdmin.from('automation_flows').select('*', { count: 'exact', head: true }).eq('merchant_id', merchantId).eq('active', true),
   ])
 
@@ -83,21 +83,26 @@ export async function GET(req: NextRequest) {
   const campaignRevenue = (campaignAttribs || []).reduce((s, a) => s + (parseFloat(a.revenue) || 0), 0)
   const campaignOrders = (campaignAttribs || []).length
 
-  // Per-campaign attribution for the recent campaigns list
+  // Per-campaign attribution + click counts for the recent campaigns list
   const recentCampaignIds = (recentCampaigns || []).map(c => c.id)
   let recentCampaignAttribs: { campaign_id: string; revenue: string }[] = []
+  let recentCampaignClicks: { campaign_id: string }[] = []
   if (recentCampaignIds.length > 0) {
-    const { data } = await supabaseAdmin.from('campaign_attributions')
-      .select('campaign_id, revenue')
-      .in('campaign_id', recentCampaignIds)
-    recentCampaignAttribs = (data || []) as { campaign_id: string; revenue: string }[]
+    const [{ data: attribData }, { data: clickData }] = await Promise.all([
+      supabaseAdmin.from('campaign_attributions').select('campaign_id, revenue').in('campaign_id', recentCampaignIds),
+      supabaseAdmin.from('campaign_clicks').select('campaign_id').in('campaign_id', recentCampaignIds),
+    ])
+    recentCampaignAttribs = (attribData || []) as { campaign_id: string; revenue: string }[]
+    recentCampaignClicks = (clickData || []) as { campaign_id: string }[]
   }
   const recentCampaignsWithStats = (recentCampaigns || []).map(c => {
     const attribs = recentCampaignAttribs.filter(a => a.campaign_id === c.id)
+    const link_clicks = recentCampaignClicks.filter(cl => cl.campaign_id === c.id).length
     return {
       id: c.id, name: c.name, recipient_count: c.recipient_count, created_at: c.created_at,
       attributed_revenue: attribs.reduce((s, a) => s + (parseFloat(a.revenue) || 0), 0),
       attributed_orders: attribs.length,
+      link_clicks,
     }
   })
 

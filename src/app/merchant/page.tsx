@@ -11,7 +11,7 @@ interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
   totalPointsLiability: number; campaignRevenue: number; campaignOrders: number
   activeFlowsCount: number
-  recentCampaigns: { id: string; name: string; recipient_count: number; created_at: string; attributed_revenue: number; attributed_orders: number }[]
+  recentCampaigns: { id: string; name: string; recipient_count: number; created_at: string; attributed_revenue: number; attributed_orders: number; link_clicks: number }[]
   tierBreakdown: { Bronze: number; Silver: number; Gold: number }
   offerPerformance: { id: string; name: string; count: number; pct: number }[]
   pointsChart: { date: string; value: number }[]; signupsChart: { date: string; value: number }[]
@@ -130,6 +130,8 @@ function MerchantDashboardInner() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
   const [segments, setSegments] = useState<any>(null)
+  const [campaignDetail, setCampaignDetail] = useState<Analytics['recentCampaigns'][0] | null>(null)
+  const [campaignSort, setCampaignSort] = useState<'recent' | 'revenue_high' | 'revenue_low' | 'clicks'>('recent')
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [automations, setAutomations] = useState<Automation[]>([])
@@ -512,54 +514,63 @@ function MerchantDashboardInner() {
                   </div>
                 )}
 
-                {/* Campaign Revenue + Recent Campaigns */}
-                <div className="bg-[#16162a] border border-emerald-500/20 rounded-xl px-5 py-4">
-                  <div className="flex items-center justify-between">
+                {/* Campaigns */}
+                {analytics.recentCampaigns.length > 0 && (() => {
+                  const sorted = [...analytics.recentCampaigns].sort((a, b) => {
+                    if (campaignSort === 'revenue_high') return b.attributed_revenue - a.attributed_revenue
+                    if (campaignSort === 'revenue_low') return a.attributed_revenue - b.attributed_revenue
+                    if (campaignSort === 'clicks') return b.link_clicks - a.link_clicks
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  })
+                  return (
                     <div>
-                      <div className="text-xs text-gray-500 mb-0.5">Campaign-Attributed Revenue (30d)</div>
-                      <div className="text-sm text-gray-400 max-w-xs">Revenue from orders placed within the attribution window after receiving a campaign email.</div>
-                    </div>
-                    <div className="flex items-center gap-6 shrink-0 ml-6">
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-emerald-400">${analytics.campaignRevenue.toFixed(2)}</div>
-                        <div className="text-xs text-gray-600">revenue driven</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-emerald-300">{analytics.campaignOrders}</div>
-                        <div className="text-xs text-gray-600">orders</div>
-                      </div>
-                      {analytics.activeFlowsCount > 0 && (
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-purple-400">{analytics.activeFlowsCount}</div>
-                          <div className="text-xs text-gray-600">active flows</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {analytics.recentCampaigns.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Recent Campaigns</div>
-                        <button onClick={() => setTab('campaigns')} className="text-xs text-gray-500 hover:text-white transition">View all →</button>
-                      </div>
-                      <div className="space-y-2.5">
-                        {analytics.recentCampaigns.map(c => (
-                          <div key={c.id} className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm text-white truncate">{c.name}</div>
-                              <div className="text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()} · {c.recipient_count.toLocaleString()} recipients</div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <div className="text-sm font-bold text-emerald-400">${c.attributed_revenue.toFixed(2)}</div>
-                              <div className="text-xs text-gray-600">{c.attributed_orders} attributed orders</div>
-                            </div>
+                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <div className="text-sm font-semibold text-gray-300">Campaigns</div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            {([
+                              { v: 'recent', l: 'Recent' },
+                              { v: 'revenue_high', l: 'Top Revenue' },
+                              { v: 'revenue_low', l: 'Lowest' },
+                              { v: 'clicks', l: 'Most Clicks' },
+                            ] as const).map(s => (
+                              <button key={s.v} onClick={() => setCampaignSort(s.v)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${campaignSort === s.v ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:text-white'}`}>
+                                {s.l}
+                              </button>
+                            ))}
                           </div>
-                        ))}
+                          <button onClick={() => setTab('campaigns')} className="text-xs text-gray-500 hover:text-white transition">View all →</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {sorted.map(c => {
+                          const ctr = c.recipient_count > 0 ? ((c.link_clicks / c.recipient_count) * 100).toFixed(1) : '0.0'
+                          return (
+                            <button key={c.id} onClick={() => setCampaignDetail(c)}
+                              className="bg-[#16162a] border border-white/10 hover:border-emerald-500/40 rounded-xl p-4 text-left transition group w-full">
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-white truncate group-hover:text-emerald-300 transition">{c.name}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{new Date(c.created_at).toLocaleDateString()}</div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-lg font-bold text-emerald-400">${c.attributed_revenue.toFixed(2)}</div>
+                                  <div className="text-xs text-gray-600">revenue</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">📧 {c.recipient_count.toLocaleString()}</span>
+                                <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">👆 {c.link_clicks} · {ctr}%</span>
+                                <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">🛒 {c.attributed_orders}</span>
+                              </div>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
-                  )}
-                </div>
+                  )
+                })()}
               </>
             )}
           </div>
@@ -1045,6 +1056,58 @@ function MerchantDashboardInner() {
       )}
 
       {/* Detail Drawer */}
+      {/* Campaign Detail Drawer */}
+      {campaignDetail && (() => {
+        const c = campaignDetail
+        const ctr = c.recipient_count > 0 ? ((c.link_clicks / c.recipient_count) * 100).toFixed(1) : '0.0'
+        const rpe = c.recipient_count > 0 ? (c.attributed_revenue / c.recipient_count).toFixed(2) : '0.00'
+        const convRate = c.link_clicks > 0 ? ((c.attributed_orders / c.link_clicks) * 100).toFixed(1) : '0.0'
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setCampaignDetail(null)} />
+            <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+              <div className="px-6 pt-5 pb-4 border-b border-white/10 shrink-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-white text-base">{c.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Sent {new Date(c.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                  </div>
+                  <button onClick={() => setCampaignDetail(null)} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center shrink-0">×</button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                {/* Revenue highlight */}
+                <div className="bg-emerald-900/20 border border-emerald-500/20 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-emerald-400">${c.attributed_revenue.toFixed(2)}</div>
+                  <div className="text-xs text-gray-400 mt-1">Attributed Revenue</div>
+                  <div className="text-xs text-gray-600 mt-0.5">${rpe} per email sent</div>
+                </div>
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Emails Sent', value: c.recipient_count.toLocaleString(), icon: '📧', color: 'text-white' },
+                    { label: 'Link Clicks', value: c.link_clicks.toLocaleString(), icon: '👆', color: 'text-blue-400', sub: `${ctr}% CTR` },
+                    { label: 'Attributed Orders', value: c.attributed_orders.toLocaleString(), icon: '🛒', color: 'text-purple-400', sub: `${convRate}% conv. rate` },
+                    { label: 'Revenue / Email', value: `$${rpe}`, icon: '📈', color: 'text-emerald-400' },
+                  ].map(stat => (
+                    <div key={stat.label} className="bg-[#0f0f1a] rounded-xl p-4">
+                      <div className="text-lg mb-1">{stat.icon}</div>
+                      <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{stat.label}</div>
+                      {stat.sub && <div className="text-xs text-gray-600 mt-0.5">{stat.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => { setCampaignDetail(null); setTab('campaigns') }}
+                  className="w-full text-center text-xs text-gray-500 hover:text-white transition py-2 border border-white/10 hover:border-white/25 rounded-lg">
+                  Go to Campaigns tab →
+                </button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
       {drawer.type && (() => {
         const TYPE_LABEL: Record<string, string> = {
           earn_order: 'Purchase', earn_signup: 'Sign-up bonus', earn_referral: 'Referral',
