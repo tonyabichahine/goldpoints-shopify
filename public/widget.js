@@ -25,7 +25,7 @@
   // ── Styles ────────────────────────────────────────────────────────────
   const style = document.createElement('style')
   style.textContent = `
-    #gp-btn{position:fixed;bottom:24px;right:24px;height:48px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:8px;z-index:99998;font-size:.9rem;font-weight:700;color:#fff;transition:transform .2s;white-space:nowrap;background:#6c3fff;opacity:0}
+    #gp-btn{position:fixed;bottom:24px;right:24px;height:48px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:8px;z-index:99998;font-size:.9rem;font-weight:700;color:#fff;transition:transform .2s;white-space:nowrap;background:#6c3fff;opacity:0;pointer-events:none}
     #gp-btn:hover{transform:translateY(-2px);opacity:.92}
     #gp-panel{position:fixed;bottom:90px;right:24px;width:340px;max-height:580px;background:#16162a;border:1px solid rgba(255,255,255,.1);border-radius:20px;overflow:hidden;display:none;flex-direction:column;z-index:99999;box-shadow:0 8px 40px rgba(0,0,0,.6);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e0e0f0}
     #gp-panel.open{display:flex}
@@ -134,7 +134,7 @@
   async function loadConfig() {
     render('loading')
     config = await api(`/api/widget/config?shop=${SHOP}`)
-    if (config.error) { render('error'); return }
+    if (config.error) { btn.style.opacity='1'; btn.style.pointerEvents='auto'; render('error'); return }
     btn.style.background = color()
     const tc = config.widget_btn_text_color || '#ffffff'
     btn.style.color = tc
@@ -159,7 +159,7 @@
     panel.style.top    = isTop ? `${ob + 64}px` : 'auto'
     panel.style.right  = isLeft ? 'auto' : `${os}px`
     panel.style.left   = isLeft ? `${os}px` : 'auto'
-    btn.style.opacity = '1'
+    btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'
 
     if (CUSTOMER_EMAIL) {
       const data = await api(`/api/widget/points?shop=${SHOP}&email=${encodeURIComponent(CUSTOMER_EMAIL)}`)
