@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const order = JSON.parse(body)
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, tier_silver, tier_gold').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ ok: true })
 
   // Find the points transaction for this order
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!customer) return NextResponse.json({ ok: true })
 
   const newPoints = Math.max(0, customer.points - tx.points)
-  const newTier = getTier(newPoints)
+  const newTier = getTier(newPoints, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
 
   await Promise.all([
     supabaseAdmin.from('customers').update({ points: newPoints, tier: newTier }).eq('id', customer.id),

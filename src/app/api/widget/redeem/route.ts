@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   if (!shop || !email || !offerId) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, shopify_access_token').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, shopify_access_token, tier_silver, tier_gold').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const [{ data: customer }, { data: offer }] = await Promise.all([
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const newPoints = customer.points - offer.points_required
   await Promise.all([
-    supabaseAdmin.from('customers').update({ points: newPoints, tier: getTier(newPoints) }).eq('id', customer.id),
+    supabaseAdmin.from('customers').update({ points: newPoints, tier: getTier(newPoints, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000) }).eq('id', customer.id),
     supabaseAdmin.from('point_transactions').insert({
       merchant_id: merchant.id, customer_id: customer.id,
       type: 'redeem', points: -offer.points_required, description: `Redeemed: ${offer.name}`,

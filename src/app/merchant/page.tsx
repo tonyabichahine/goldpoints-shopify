@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
@@ -501,6 +501,19 @@ function MerchantDashboardInner() {
               <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+              <div className="border-t border-white/10 pt-4">
+                <p className="text-xs text-gray-500 mb-3">Loyalty Tiers — minimum points to reach each tier. Changes apply to new transactions.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">🥈 Silver threshold (pts)</label>
+                    <input type="number" value={merchant.tier_silver ?? 500} onChange={e => setMerchant(p => p ? {...p, tier_silver: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">🥇 Gold threshold (pts)</label>
+                    <input type="number" value={merchant.tier_gold ?? 1000} onChange={e => setMerchant(p => p ? {...p, tier_gold: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                  </div>
+                </div>
+              </div>
               <div className="border-t border-white/10 pt-4">
                 <p className="text-xs text-gray-500 mb-3">Referral Program — points awarded to the referrer when a friend joins.</p>
                 <div><label className="block text-sm text-gray-400 mb-1">Referral bonus points</label><input type="number" value={merchant.referral_points || 100} onChange={e => setMerchant(p => p ? {...p, referral_points: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>

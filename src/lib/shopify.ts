@@ -59,8 +59,8 @@ export async function createDiscountCode(shop: string, token: string, code: stri
   return discount_code?.code || null
 }
 
-export function getTier(points: number) {
-  if (points >= 1000) return 'Gold'
-  if (points >= 500) return 'Silver'
+export function getTier(points: number, silverThreshold = 500, goldThreshold = 1000) {
+  if (points >= goldThreshold) return 'Gold'
+  if (points >= silverThreshold) return 'Silver'
   return 'Bronze'
 }
