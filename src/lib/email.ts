@@ -36,6 +36,28 @@ function wrapEmail(body: string) {
   </div></body></html>`
 }
 
+export async function enrollInFlows(merchantId: string, customerId: string, trigger: string) {
+  const { data: flows } = await supabaseAdmin
+    .from('automation_flows')
+    .select('id, nodes, edges')
+    .eq('merchant_id', merchantId)
+    .eq('trigger', trigger)
+    .eq('active', true)
+  if (!flows?.length) return
+  for (const flow of flows) {
+    const nodes: any[] = flow.nodes || []
+    const edges: any[] = flow.edges || []
+    const triggerNode = nodes.find((n: any) => n.type === 'trigger')
+    if (!triggerNode) continue
+    const firstEdge = edges.find((e: any) => e.source === triggerNode.id)
+    if (!firstEdge) continue
+    await supabaseAdmin.from('automation_enrollments').upsert({
+      flow_id: flow.id, merchant_id: merchantId, customer_id: customerId,
+      current_node_id: firstEdge.target, next_run_at: new Date().toISOString(), status: 'active',
+    }, { onConflict: 'flow_id,customer_id', ignoreDuplicates: true })
+  }
+}
+
 export async function fireAutomation(
   merchantId: string,
   trigger: string,

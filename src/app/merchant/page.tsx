@@ -1,11 +1,12 @@
 'use client'
 import { useEffect, useState, useRef, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string }
 interface Automation { id: string; trigger: string; name: string; subject: string; body: string; active: boolean; created_at: string }
+interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
   totalPointsLiability: number
@@ -105,9 +106,14 @@ function BarChart({ title, data, color, onSeeAll }: { title: string; data: { dat
 
 function MerchantDashboardInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings' | 'campaigns'>('overview')
+  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings' | 'campaigns' | 'flows'>(() => {
+    const t = searchParams.get('tab')
+    if (t === 'flows' || t === 'campaigns' || t === 'offers' || t === 'customers' || t === 'settings') return t
+    return 'overview'
+  })
   const [customers, setCustomers] = useState<any[]>([])
   const [offers, setOffers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
@@ -125,6 +131,9 @@ function MerchantDashboardInner() {
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [automations, setAutomations] = useState<Automation[]>([])
+  const [flows, setFlows] = useState<FlowSummary[]>([])
+  const [flowsLoading, setFlowsLoading] = useState(false)
+  const [creatingFlow, setCreatingFlow] = useState(false)
   const [newCampaign, setNewCampaign] = useState({ name: '', subject: '', body: '', segment: 'all' })
   const [newAutomation, setNewAutomation] = useState({ trigger: 'signup', name: '', subject: '', body: '' })
   const [campaignSending, setCampaignSending] = useState(false)
@@ -144,6 +153,7 @@ function MerchantDashboardInner() {
     if (tab === 'offers') loadOffers()
     if (tab === 'overview') loadAnalytics()
     if (tab === 'campaigns') { loadCampaigns(); loadAutomations() }
+    if (tab === 'flows') loadFlows()
   }, [tab])
 
   async function loadCustomers() {
@@ -164,6 +174,31 @@ function MerchantDashboardInner() {
   async function loadAutomations() {
     const r = await fetch('/api/merchant/automations')
     if (r.ok) setAutomations(await r.json())
+  }
+
+  async function loadFlows() {
+    setFlowsLoading(true)
+    const r = await fetch('/api/merchant/flows')
+    if (r.ok) setFlows(await r.json())
+    setFlowsLoading(false)
+  }
+
+  async function createFlow() {
+    setCreatingFlow(true)
+    const r = await fetch('/api/merchant/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New Flow', trigger: 'signup' }) })
+    const d = await r.json()
+    setCreatingFlow(false)
+    if (d.id) router.push(`/merchant/flows/${d.id}`)
+  }
+
+  async function deleteFlow(id: string) {
+    await fetch(`/api/merchant/flows?id=${id}`, { method: 'DELETE' })
+    setFlows(prev => prev.filter(f => f.id !== id))
+  }
+
+  async function toggleFlow(id: string, active: boolean) {
+    await fetch('/api/merchant/flows', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, active }) })
+    setFlows(prev => prev.map(f => f.id === id ? { ...f, active } : f))
   }
 
   async function sendCampaign() {
@@ -324,7 +359,7 @@ function MerchantDashboardInner() {
 
       <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
         <div className="flex gap-2 flex-wrap">
-          {(['overview','customers','offers','campaigns','settings'] as const).map(t => (
+          {(['overview','customers','offers','campaigns','flows','settings'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
           ))}
         </div>
@@ -670,6 +705,62 @@ function MerchantDashboardInner() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'flows' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-purple-400">Automation Flows</h2>
+                <p className="text-sm text-gray-500 mt-1">Visual multi-step automations — drag and drop emails, waits, conditions, and more.</p>
+              </div>
+              <button onClick={createFlow} disabled={creatingFlow}
+                className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-semibold transition shrink-0">
+                {creatingFlow ? 'Creating…' : '+ New Flow'}
+              </button>
+            </div>
+
+            {flowsLoading && <p className="text-gray-500 text-sm">Loading flows…</p>}
+
+            {!flowsLoading && flows.length === 0 && (
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-10 text-center">
+                <div className="text-4xl mb-3">⚡</div>
+                <div className="text-gray-400 font-semibold mb-1">No flows yet</div>
+                <div className="text-gray-600 text-sm mb-4">Create a visual multi-step automation — send emails, add waits, branch on conditions.</div>
+                <button onClick={createFlow} disabled={creatingFlow}
+                  className="bg-purple-600 hover:bg-purple-500 px-5 py-2 rounded-lg text-sm font-semibold">
+                  {creatingFlow ? 'Creating…' : 'Create your first flow'}
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {flows.map(f => {
+                const triggerLabel: Record<string, string> = { signup: '🎉 New Signup', tier_silver: '🥈 Reaches Silver', tier_gold: '🥇 Reaches Gold', inactive_30: '💤 30-Day Inactive', birthday: '🎂 Birthday' }
+                return (
+                  <div key={f.id} className="bg-[#16162a] border border-white/10 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button onClick={() => toggleFlow(f.id, !f.active)}
+                        className={`w-10 h-6 rounded-full transition-colors relative shrink-0 ${f.active ? 'bg-purple-600' : 'bg-gray-700'}`}>
+                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${f.active ? 'left-5' : 'left-1'}`} />
+                      </button>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm text-white truncate">{f.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{triggerLabel[f.trigger] || f.trigger} · {new Date(f.created_at).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => router.push(`/merchant/flows/${f.id}`)}
+                        className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-lg transition">
+                        Edit →
+                      </button>
+                      <button onClick={() => deleteFlow(f.id)} className="text-red-400 hover:text-red-300 text-sm">Remove</button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

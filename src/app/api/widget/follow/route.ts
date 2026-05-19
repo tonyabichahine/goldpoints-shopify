@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
-import { fireAutomation } from '@/lib/email'
+import { fireAutomation, enrollInFlows } from '@/lib/email'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
   if (newTier !== customer.tier) {
     const trigger = newTier === 'Gold' ? 'tier_gold' : 'tier_silver'
     fireAutomation(merchant.id, trigger, { email, name: customer.name || email, points: newPoints, tier: newTier }, merchant.store_name).catch(() => {})
+    enrollInFlows(merchant.id, customer.id, trigger).catch(() => {})
   }
 
   return NextResponse.json({ newPoints, pointsEarned: pts }, { headers: cors })

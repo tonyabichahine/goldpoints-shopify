@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData, SHOPIFY_API_SECRET, tagShopifyCustomer } from '@/lib/shopify'
-import { fireAutomation } from '@/lib/email'
+import { fireAutomation, enrollInFlows } from '@/lib/email'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       fireAutomation(merchant.id, trigger, {
         email: customerEmail, name: customer.name || customerEmail, points: newPoints, tier: newTier,
       }, merchant.store_name).catch(() => {})
+      enrollInFlows(merchant.id, customer.id, trigger).catch(() => {})
     }
   }
 
