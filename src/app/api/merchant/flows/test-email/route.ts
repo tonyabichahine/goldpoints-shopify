@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await resend.emails.send({
-      from: 'GoldPoints <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL || 'GoldPoints <onboarding@resend.dev>',
       to: recipient,
       subject: `[TEST] ${sub(subject) || '(no subject)'}`,
       html,

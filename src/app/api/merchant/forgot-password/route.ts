@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-merchant-password?token=${token}`
 
   await resend.emails.send({
-    from: 'GoldPoints <onboarding@resend.dev>',
+    from: process.env.RESEND_FROM_EMAIL || 'GoldPoints <onboarding@resend.dev>',
     to: process.env.TEST_EMAIL || merchant.email,
     subject: 'Reset your GoldPoints dashboard password',
     html: `

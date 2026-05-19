@@ -3,12 +3,13 @@ import { supabaseAdmin } from './supabase'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'GoldPoints <onboarding@resend.dev>'
 
 export async function sendEmail(to: string, subject: string, htmlBody: string) {
   const recipient = process.env.TEST_EMAIL || to
   try {
     await resend.emails.send({
-      from: 'GoldPoints <onboarding@resend.dev>',
+      from: FROM_EMAIL,
       to: recipient,
       subject,
       html: wrapEmail(htmlBody),
@@ -27,7 +28,7 @@ export async function sendCampaignEmail(
     : ''
   try {
     await resend.emails.send({
-      from: 'GoldPoints <onboarding@resend.dev>',
+      from: FROM_EMAIL,
       to: recipient,
       subject,
       html: wrapEmail(body + trackedCta),
@@ -82,7 +83,7 @@ export function buildCampaignEmailPayload(
     <div class="bdy">${escaped}${trackedBtn}</div>
     <div class="ftr">You're receiving this as a loyalty member of this store.</div>
   </div></body></html>`
-  return { from: 'GoldPoints <onboarding@resend.dev>', to: recipient, subject, html }
+  return { from: FROM_EMAIL, to: recipient, subject, html }
 }
 
 export async function sendCampaignEmailHtml(
@@ -111,7 +112,7 @@ export async function sendCampaignEmailHtml(
     <div class="ftr">You're receiving this as a loyalty member of this store.</div>
   </div></body></html>`
   try {
-    await resend.emails.send({ from: 'GoldPoints <onboarding@resend.dev>', to: recipient, subject, html })
+    await resend.emails.send({ from: FROM_EMAIL, to: recipient, subject, html })
   } catch {}
 }
 
@@ -141,7 +142,7 @@ export async function sendFlowEmail(
     <div class="ftr">You're receiving this as a loyalty member of this store.</div>
   </div></body></html>`
   try {
-    await resend.emails.send({ from: 'GoldPoints <onboarding@resend.dev>', to: recipient, subject, html })
+    await resend.emails.send({ from: FROM_EMAIL, to: recipient, subject, html })
   } catch {}
 }
 

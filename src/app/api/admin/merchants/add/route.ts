@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
   // Send welcome email
   const emailResult = await resend.emails.send({
-    from: 'GoldPoints <onboarding@resend.dev>',
+    from: process.env.RESEND_FROM_EMAIL || 'GoldPoints <onboarding@resend.dev>',
     to: process.env.TEST_EMAIL || email,
     subject: 'Welcome to GoldPoints — Your Account is Ready',
     html: `
