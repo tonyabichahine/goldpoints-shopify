@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
+import { fireAutomation } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, signup_bonus, referral_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, store_name, signup_bonus, referral_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const { data: existing } = await supabaseAdmin
@@ -94,6 +95,8 @@ export async function POST(req: NextRequest) {
   if (txsToInsert.length > 0) {
     await supabaseAdmin.from('point_transactions').insert(txsToInsert)
   }
+
+  fireAutomation(merchant.id, 'signup', { email: email.toLowerCase().trim(), name: name || email, points: customer.points, tier: customer.tier }, merchant.store_name || '').catch(() => {})
 
   return NextResponse.json({ customer, isNew: true }, { headers: cors })
 }

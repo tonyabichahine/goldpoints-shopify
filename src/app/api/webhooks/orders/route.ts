@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getTier, buildUpgradeBonusData, SHOPIFY_API_SECRET } from '@/lib/shopify'
+import { getTier, buildUpgradeBonusData, SHOPIFY_API_SECRET, tagShopifyCustomer } from '@/lib/shopify'
+import { fireAutomation } from '@/lib/email'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants')
-    .select('id, points_per_dollar, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
+    .select('id, store_name, shopify_access_token, points_per_dollar, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
     .eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ ok: true })
 
@@ -27,9 +28,15 @@ export async function POST(req: NextRequest) {
 
   const { data: customer } = await supabaseAdmin
     .from('customers')
-    .select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded')
+    .select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded, shopify_customer_id, name, email')
     .eq('merchant_id', merchant.id).eq('email', customerEmail).single()
   if (!customer) return NextResponse.json({ ok: true })
+
+  const shopifyCustomerId = String(order.customer?.id || '')
+  if (shopifyCustomerId && !customer.shopify_customer_id) {
+    supabaseAdmin.from('customers').update({ shopify_customer_id: shopifyCustomerId }).eq('id', customer.id).then(() => {})
+  }
+  const effectiveShopifyId = shopifyCustomerId || customer.shopify_customer_id || ''
 
   const multiplierMap: Record<string, number> = {
     Bronze: merchant.tier_bronze_multiplier ?? 1.0,
@@ -48,9 +55,11 @@ export async function POST(req: NextRequest) {
     customer.silver_bonus_awarded ?? false, customer.gold_bonus_awarded ?? false,
   )
 
+  const newPoints = customer.points + pointsEarned + extraPoints
+
   await Promise.all([
     supabaseAdmin.from('customers').update({
-      points: customer.points + pointsEarned + extraPoints,
+      points: newPoints,
       lifetime_points: newLifetime + extraPoints,
       tier: newTier,
       ...bonusUpdates,
@@ -65,6 +74,19 @@ export async function POST(req: NextRequest) {
       ...bonusTxs,
     ]),
   ])
+
+  if (effectiveShopifyId) {
+    tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(() => {})
+  }
+
+  if (newTier !== customer.tier) {
+    const trigger = newTier === 'Gold' ? 'tier_gold' : newTier === 'Silver' ? 'tier_silver' : null
+    if (trigger) {
+      fireAutomation(merchant.id, trigger, {
+        email: customerEmail, name: customer.name || customerEmail, points: newPoints, tier: newTier,
+      }, merchant.store_name).catch(() => {})
+    }
+  }
 
   return NextResponse.json({ ok: true })
 }

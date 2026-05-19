@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
+import { fireAutomation } from '@/lib/email'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -13,11 +14,11 @@ export async function POST(req: NextRequest) {
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, follow_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, store_name, follow_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const { data: customer } = await supabaseAdmin
-    .from('customers').select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded').eq('merchant_id', merchant.id).eq('email', email).single()
+    .from('customers').select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded, name').eq('merchant_id', merchant.id).eq('email', email).single()
   if (!customer) return NextResponse.json({ error: 'Account not found' }, { status: 404, headers: cors })
 
   const { data: existing } = await supabaseAdmin
@@ -43,6 +44,11 @@ export async function POST(req: NextRequest) {
       ...bonusTxs,
     ]),
   ])
+
+  if (newTier !== customer.tier) {
+    const trigger = newTier === 'Gold' ? 'tier_gold' : 'tier_silver'
+    fireAutomation(merchant.id, trigger, { email, name: customer.name || email, points: newPoints, tier: newTier }, merchant.store_name).catch(() => {})
+  }
 
   return NextResponse.json({ newPoints, pointsEarned: pts }, { headers: cors })
 }

@@ -59,6 +59,29 @@ export async function createDiscountCode(shop: string, token: string, code: stri
   return discount_code?.code || null
 }
 
+export async function tagShopifyCustomer(
+  accessToken: string,
+  shopDomain: string,
+  shopifyCustomerId: string,
+  tier: string,
+) {
+  if (!accessToken || !shopifyCustomerId || accessToken === 'pending') return
+  try {
+    const getRes = await fetch(`https://${shopDomain}/admin/api/2024-01/customers/${shopifyCustomerId}.json`, {
+      headers: { 'X-Shopify-Access-Token': accessToken },
+    })
+    if (!getRes.ok) return
+    const { customer } = await getRes.json()
+    const tags = (customer.tags || '').split(',').map((t: string) => t.trim()).filter((t: string) => t && !t.startsWith('gp-'))
+    tags.push(`gp-${tier.toLowerCase()}`)
+    await fetch(`https://${shopDomain}/admin/api/2024-01/customers/${shopifyCustomerId}.json`, {
+      method: 'PUT',
+      headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer: { id: shopifyCustomerId, tags: tags.join(', ') } }),
+    })
+  } catch {}
+}
+
 export function getTier(points: number, silverThreshold = 500, goldThreshold = 1000) {
   if (points >= goldThreshold) return 'Gold'
   if (points >= silverThreshold) return 'Silver'

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getTier, SHOPIFY_API_SECRET } from '@/lib/shopify'
+import { getTier, SHOPIFY_API_SECRET, tagShopifyCustomer } from '@/lib/shopify'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const order = JSON.parse(body)
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, tier_silver, tier_gold').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, shopify_access_token, tier_silver, tier_gold').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ ok: true })
 
   const { data: tx } = await supabaseAdmin
@@ -28,11 +28,10 @@ export async function POST(req: NextRequest) {
   if (!tx) return NextResponse.json({ ok: true })
 
   const { data: customer } = await supabaseAdmin
-    .from('customers').select('id, points, lifetime_points').eq('id', tx.customer_id).single()
+    .from('customers').select('id, points, lifetime_points, shopify_customer_id').eq('id', tx.customer_id).single()
   if (!customer) return NextResponse.json({ ok: true })
 
   const newPoints = Math.max(0, customer.points - tx.points)
-  // Cancel also deducts from lifetime_points — purchase never happened, tier can drop
   const newLifetime = Math.max(0, (customer.lifetime_points ?? 0) - tx.points)
   const newTier = getTier(newLifetime, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
 
@@ -47,6 +46,10 @@ export async function POST(req: NextRequest) {
       description: `Order #${order.order_number} cancelled`,
     }),
   ])
+
+  if (customer.shopify_customer_id) {
+    tagShopifyCustomer(merchant.shopify_access_token, shop, customer.shopify_customer_id, newTier).catch(() => {})
+  }
 
   return NextResponse.json({ ok: true })
 }

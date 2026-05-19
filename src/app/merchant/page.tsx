@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
+interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string }
+interface Automation { id: string; trigger: string; name: string; subject: string; body: string; active: boolean; created_at: string }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
   totalPointsLiability: number
@@ -105,7 +107,7 @@ function MerchantDashboardInner() {
   const router = useRouter()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings'>('overview')
+  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings' | 'campaigns'>('overview')
   const [customers, setCustomers] = useState<any[]>([])
   const [offers, setOffers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
@@ -121,6 +123,13 @@ function MerchantDashboardInner() {
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
   const [segments, setSegments] = useState<any>(null)
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [automations, setAutomations] = useState<Automation[]>([])
+  const [newCampaign, setNewCampaign] = useState({ name: '', subject: '', body: '', segment: 'all' })
+  const [newAutomation, setNewAutomation] = useState({ trigger: 'signup', name: '', subject: '', body: '' })
+  const [campaignSending, setCampaignSending] = useState(false)
+  const [campaignMsg, setCampaignMsg] = useState('')
+  const [showAutoForm, setShowAutoForm] = useState(false)
   const [aiChat, setAiChat] = useState<{ open: boolean; messages: { role: 'user' | 'ai'; content: string }[]; loading: boolean; input: string }>({ open: false, messages: [], loading: false, input: '' })
   const aiEndRef = useRef<HTMLDivElement>(null)
 
@@ -134,6 +143,7 @@ function MerchantDashboardInner() {
     if (tab === 'customers') loadCustomers()
     if (tab === 'offers') loadOffers()
     if (tab === 'overview') loadAnalytics()
+    if (tab === 'campaigns') { loadCampaigns(); loadAutomations() }
   }, [tab])
 
   async function loadCustomers() {
@@ -144,6 +154,50 @@ function MerchantDashboardInner() {
   async function loadOffers() {
     const r = await fetch('/api/merchant/offers')
     setOffers(await r.json())
+  }
+
+  async function loadCampaigns() {
+    const r = await fetch('/api/merchant/campaigns')
+    if (r.ok) setCampaigns(await r.json())
+  }
+
+  async function loadAutomations() {
+    const r = await fetch('/api/merchant/automations')
+    if (r.ok) setAutomations(await r.json())
+  }
+
+  async function sendCampaign() {
+    if (!newCampaign.name || !newCampaign.subject || !newCampaign.body) { setCampaignMsg('Fill in all fields.'); return }
+    setCampaignSending(true); setCampaignMsg('')
+    const r = await fetch('/api/merchant/campaigns/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newCampaign, emailBody: newCampaign.body }) })
+    const d = await r.json()
+    if (!r.ok) { setCampaignMsg(d.error || 'Failed to send.'); setCampaignSending(false); return }
+    setCampaignMsg(`✓ Sent to ${d.sent} customers!`)
+    setCampaigns(prev => [d.campaign, ...prev])
+    setNewCampaign({ name: '', subject: '', body: '', segment: 'all' })
+    setCampaignSending(false)
+  }
+
+  async function deleteCampaign(id: string) {
+    await fetch(`/api/merchant/campaigns?id=${id}`, { method: 'DELETE' })
+    setCampaigns(prev => prev.filter(c => c.id !== id))
+  }
+
+  async function addAutomation() {
+    if (!newAutomation.name || !newAutomation.subject || !newAutomation.body) return
+    const r = await fetch('/api/merchant/automations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAutomation) })
+    const d = await r.json()
+    if (!d.error) { setAutomations(prev => [d, ...prev]); setNewAutomation({ trigger: 'signup', name: '', subject: '', body: '' }); setShowAutoForm(false) }
+  }
+
+  async function toggleAutomation(id: string, active: boolean) {
+    await fetch('/api/merchant/automations', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, active }) })
+    setAutomations(prev => prev.map(a => a.id === id ? { ...a, active } : a))
+  }
+
+  async function deleteAutomation(id: string) {
+    await fetch(`/api/merchant/automations?id=${id}`, { method: 'DELETE' })
+    setAutomations(prev => prev.filter(a => a.id !== id))
   }
 
   async function loadAnalytics() {
@@ -270,7 +324,7 @@ function MerchantDashboardInner() {
 
       <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
         <div className="flex gap-2 flex-wrap">
-          {(['overview','customers','offers','settings'] as const).map(t => (
+          {(['overview','customers','offers','campaigns','settings'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
           ))}
         </div>
@@ -494,6 +548,129 @@ function MerchantDashboardInner() {
                 <button onClick={() => deleteOffer(o.id)} className="text-red-400 hover:text-red-300 text-sm">Remove</button>
               </div>
             ))}</div>
+          </div>
+        )}
+
+        {tab === 'campaigns' && (
+          <div className="space-y-8">
+            <h2 className="text-2xl font-bold text-purple-400">Campaigns</h2>
+
+            {/* Send Campaign */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-200 mb-4">Email Campaign</h3>
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Campaign name (internal)</label>
+                    <input value={newCampaign.name} onChange={e => setNewCampaign(p => ({...p, name: e.target.value}))} placeholder="e.g. Summer promo" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Segment</label>
+                    <select value={newCampaign.segment} onChange={e => setNewCampaign(p => ({...p, segment: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
+                      <option value="all">All Customers</option>
+                      <option value="Bronze">🥉 Bronze Tier</option>
+                      <option value="Silver">🥈 Silver Tier</option>
+                      <option value="Gold">🥇 Gold Tier</option>
+                      <option value="active">🛍️ Active (last 30d)</option>
+                      <option value="at_risk">⚠️ At Risk (31–60d)</option>
+                      <option value="dormant">💤 Dormant (61–90d)</option>
+                      <option value="never">🆕 Never Purchased</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Subject line</label>
+                  <input value={newCampaign.subject} onChange={e => setNewCampaign(p => ({...p, subject: e.target.value}))} placeholder="You have rewards waiting 🎁" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Email body</label>
+                  <p className="text-xs text-gray-600 mb-1">Personalize with: <span className="text-purple-400">{'{{name}}'}</span>, <span className="text-purple-400">{'{{points}}'}</span>, <span className="text-purple-400">{'{{tier}}'}</span>, <span className="text-purple-400">{'{{store}}'}</span></p>
+                  <textarea value={newCampaign.body} onChange={e => setNewCampaign(p => ({...p, body: e.target.value}))} rows={5} placeholder={'Hi {{name}},\n\nYou have {{points}} loyalty points waiting. Come back and use them!\n\n— {{store}}'} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm resize-y" />
+                </div>
+                {campaignMsg && <p className={`text-sm font-medium ${campaignMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{campaignMsg}</p>}
+                <button onClick={sendCampaign} disabled={campaignSending} className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-semibold">
+                  {campaignSending ? 'Sending...' : '✉️ Send Campaign'}
+                </button>
+              </div>
+            </div>
+
+            {/* Campaign History */}
+            {campaigns.length > 0 && (
+              <div>
+                <h3 className="text-base font-semibold text-gray-200 mb-4">Campaign History</h3>
+                <div className="space-y-3">
+                  {campaigns.map(c => (
+                    <div key={c.id} className="bg-[#16162a] border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-sm">{c.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">"{c.subject}" · {c.segment} · {c.recipient_count} recipients · {new Date(c.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <button onClick={() => deleteCampaign(c.id)} className="text-red-400 hover:text-red-300 text-sm ml-4 shrink-0">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Automations */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-200 mb-1">Automations</h3>
+              <p className="text-xs text-gray-500 mb-4">Automatically email customers when they hit milestones. Supports <span className="text-purple-400">{'{{name}}'}</span>, <span className="text-purple-400">{'{{points}}'}</span>, <span className="text-purple-400">{'{{tier}}'}</span>, <span className="text-purple-400">{'{{store}}'}</span>.</p>
+              <div className="space-y-3 mb-4">
+                {automations.map(a => (
+                  <div key={a.id} className="bg-[#16162a] border border-white/10 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button onClick={() => toggleAutomation(a.id, !a.active)}
+                        className={`w-10 h-6 rounded-full transition-colors relative shrink-0 ${a.active ? 'bg-purple-600' : 'bg-gray-700'}`}>
+                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${a.active ? 'left-5' : 'left-1'}`} />
+                      </button>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate">{a.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {a.trigger === 'signup' ? '🎉 New signup' : a.trigger === 'tier_silver' ? '🥈 Silver reached' : '🥇 Gold reached'} · "{a.subject}"
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => deleteAutomation(a.id)} className="text-red-400 hover:text-red-300 text-sm shrink-0">Remove</button>
+                  </div>
+                ))}
+                {automations.length === 0 && !showAutoForm && <p className="text-gray-600 text-sm">No automations yet.</p>}
+              </div>
+              {!showAutoForm && (
+                <button onClick={() => setShowAutoForm(true)} className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition">+ Add Automation</button>
+              )}
+              {showAutoForm && (
+                <div className="bg-[#16162a] border border-purple-500/30 rounded-xl p-6 space-y-4">
+                  <h4 className="font-semibold text-sm text-gray-200">New Automation</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Trigger</label>
+                      <select value={newAutomation.trigger} onChange={e => setNewAutomation(p => ({...p, trigger: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
+                        <option value="signup">🎉 New Customer Signup</option>
+                        <option value="tier_silver">🥈 Customer reaches Silver</option>
+                        <option value="tier_gold">🥇 Customer reaches Gold</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Automation name</label>
+                      <input value={newAutomation.name} onChange={e => setNewAutomation(p => ({...p, name: e.target.value}))} placeholder="e.g. Welcome email" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Subject</label>
+                    <input value={newAutomation.subject} onChange={e => setNewAutomation(p => ({...p, subject: e.target.value}))} placeholder="Welcome to {{store}} rewards!" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Email body</label>
+                    <textarea value={newAutomation.body} onChange={e => setNewAutomation(p => ({...p, body: e.target.value}))} rows={4} placeholder={'Hi {{name}},\n\nWelcome to our loyalty program! You start with {{points}} points.\n\n— {{store}}'} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm resize-y" />
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={addAutomation} className="bg-purple-600 hover:bg-purple-500 px-5 py-2 rounded-lg text-sm font-semibold">Save Automation</button>
+                    <button onClick={() => setShowAutoForm(false)} className="bg-white/5 hover:bg-white/10 px-5 py-2 rounded-lg text-sm">Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
