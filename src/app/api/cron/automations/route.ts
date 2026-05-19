@@ -40,7 +40,7 @@ async function processEnrollment(enrollment: any) {
   try {
     const [flowRes, customerRes, merchantRes] = await Promise.all([
       supabaseAdmin.from('automation_flows').select('nodes, edges').eq('id', enrollment.flow_id).single(),
-      supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points').eq('id', enrollment.customer_id).single(),
+      supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points, marketing_consent').eq('id', enrollment.customer_id).single(),
       supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email').eq('id', enrollment.merchant_id).single(),
     ])
 
@@ -71,15 +71,17 @@ async function processEnrollment(enrollment: any) {
       if (node.type === 'end') { await supabaseAdmin.from('automation_enrollments').update({ status: 'completed', error_count: 0 }).eq('id', enrollment.id); return }
 
       if (node.type === 'email') {
-        if (shopifyDomain) {
-          await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain, customer.id, enrollment.merchant_id, storeName, merchantEmail, customFromEmail)
-        } else {
-          await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
+        if (customer.marketing_consent !== false) {
+          if (shopifyDomain) {
+            await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain, customer.id, enrollment.merchant_id, storeName, merchantEmail, customFromEmail)
+          } else {
+            await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
+          }
+          await supabaseAdmin.from('automation_enrollments')
+            .update({ last_email_sent_at: new Date().toISOString() })
+            .eq('id', enrollment.id)
+          enrollment.last_email_sent_at = new Date().toISOString()
         }
-        await supabaseAdmin.from('automation_enrollments')
-          .update({ last_email_sent_at: new Date().toISOString() })
-          .eq('id', enrollment.id)
-        enrollment.last_email_sent_at = new Date().toISOString()
         currentNodeId = getNextNodeId(node.id, edges)
       } else if (node.type === 'wait') {
         const ms = (node.data.unit === 'hours' ? 3600000 : 86400000) * (node.data.amount || 1)
@@ -159,27 +161,69 @@ async function enrollBirthdayCustomers() {
     .select('id, merchant_id, nodes, edges, allow_reenroll').eq('trigger', 'birthday').eq('active', true)
   if (!flows?.length) return
 
+  // 300-day window: prevents duplicate enrollment within the same calendar year
+  const cutoff300 = new Date(Date.now() - 300 * 86400000).toISOString()
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+
   for (const flow of flows) {
     const { data: birthdayData } = await supabaseAdmin.rpc('get_birthday_customers', { p_merchant_id: flow.merchant_id })
     const customers = (Array.isArray(birthdayData) ? birthdayData : birthdayData ? [birthdayData] : []) as { id: string }[]
+    if (!customers.length) continue
+
     const nodes: any[] = flow.nodes || []
     const edges: any[] = flow.edges || []
     const triggerNode = nodes.find((n: any) => n.type === 'trigger')
     const firstEdge = triggerNode ? edges.find((e: any) => e.source === triggerNode.id) : null
     if (!firstEdge) continue
+
+    const customerIds = customers.map(c => c.id)
+
+    // Load existing enrollments to guard against hourly re-enrollment
+    const { data: existing } = await supabaseAdmin
+      .from('automation_enrollments')
+      .select('customer_id, enrolled_at')
+      .eq('flow_id', flow.id)
+      .in('customer_id', customerIds)
+
+    const enrolledAtMap: Record<string, string> = {}
+    for (const e of existing || []) {
+      if (e.enrolled_at) enrolledAtMap[e.customer_id] = e.enrolled_at
+    }
+
+    // Fetch merchant birthday_bonus once per flow
+    const { data: merchant } = await supabaseAdmin
+      .from('merchants').select('birthday_bonus').eq('id', flow.merchant_id).single()
+    const birthdayBonus = merchant?.birthday_bonus || 0
+
     for (const c of customers) {
-      if (flow.allow_reenroll) {
-        // Re-enroll every year: reset status and start node
-        await supabaseAdmin.from('automation_enrollments').upsert({
-          flow_id: flow.id, merchant_id: flow.merchant_id, customer_id: c.id,
-          current_node_id: firstEdge.target, next_run_at: new Date().toISOString(), status: 'active',
-        }, { onConflict: 'flow_id,customer_id' })
-      } else {
-        await supabaseAdmin.from('automation_enrollments').upsert({
-          flow_id: flow.id, merchant_id: flow.merchant_id, customer_id: c.id,
-          current_node_id: firstEdge.target, next_run_at: new Date().toISOString(), status: 'active',
-        }, { onConflict: 'flow_id,customer_id', ignoreDuplicates: true })
+      // Skip if enrolled within the last 300 days (already got birthday this year)
+      const lastEnrolled = enrolledAtMap[c.id]
+      if (lastEnrolled && lastEnrolled > cutoff300) continue
+
+      // Award birthday bonus points once per day if configured
+      if (birthdayBonus > 0) {
+        const { data: alreadyAwarded } = await supabaseAdmin
+          .from('point_transactions')
+          .select('id').eq('merchant_id', flow.merchant_id).eq('customer_id', c.id)
+          .eq('type', 'earn_birthday').gte('created_at', todayStart.toISOString()).limit(1)
+
+        if (!alreadyAwarded?.length) {
+          const { data: cust } = await supabaseAdmin.from('customers').select('points').eq('id', c.id).single()
+          if (cust) {
+            await supabaseAdmin.from('customers').update({ points: cust.points + birthdayBonus }).eq('id', c.id)
+            await supabaseAdmin.from('point_transactions').insert({
+              merchant_id: flow.merchant_id, customer_id: c.id,
+              type: 'earn_birthday', points: birthdayBonus, description: 'Birthday bonus',
+            })
+          }
+        }
       }
+
+      await supabaseAdmin.from('automation_enrollments').upsert({
+        flow_id: flow.id, merchant_id: flow.merchant_id, customer_id: c.id,
+        current_node_id: firstEdge.target, next_run_at: new Date().toISOString(),
+        status: 'active', enrolled_at: new Date().toISOString(),
+      }, { onConflict: 'flow_id,customer_id' })
     }
   }
 }
