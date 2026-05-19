@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   const body = await req.json()
   const { data, error } = await supabaseAdmin.from('offers')
-    .insert({ merchant_id: merchantId, name: body.name, description: body.description, points_required: body.points_required, offer_type: body.offer_type, offer_value: body.offer_value })
+    .insert({ merchant_id: merchantId, name: body.name, description: body.description, points_required: body.points_required, offer_type: body.offer_type, offer_value: body.offer_value, min_tier: body.min_tier || 'Bronze' })
     .select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)

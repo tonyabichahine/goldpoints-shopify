@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const [{ data: customer }, { data: offer }] = await Promise.all([
-    supabaseAdmin.from('customers').select('id, points').eq('merchant_id', merchant.id).eq('email', email).single(),
+    supabaseAdmin.from('customers').select('id, points, lifetime_points').eq('merchant_id', merchant.id).eq('email', email).single(),
     supabaseAdmin.from('offers').select('*').eq('id', offerId).eq('merchant_id', merchant.id).single(),
   ])
 
@@ -29,8 +29,11 @@ export async function POST(req: NextRequest) {
   const discountCode = await createDiscountCode(shop, merchant.shopify_access_token, code, offer.offer_type, offer.offer_value)
 
   const newPoints = customer.points - offer.points_required
+  // Tier based on lifetime_points — redemptions never drop tier
+  const newTier = getTier(customer.lifetime_points ?? 0, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
+
   await Promise.all([
-    supabaseAdmin.from('customers').update({ points: newPoints, tier: getTier(newPoints, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000) }).eq('id', customer.id),
+    supabaseAdmin.from('customers').update({ points: newPoints, tier: newTier }).eq('id', customer.id),
     supabaseAdmin.from('point_transactions').insert({
       merchant_id: merchant.id, customer_id: customer.id,
       type: 'redeem', points: -offer.points_required, description: `Redeemed: ${offer.name}`,

@@ -114,10 +114,18 @@
   function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
   function color() { return (config && config.widget_primary_color) || '#6c3fff' }
 
-  function tierInfo(pts) {
-    if (pts >= 1000) return { name:'Gold', next:null, pct:100, icon:'🥇' }
-    if (pts >= 500)  return { name:'Silver', next:`${1000-pts} pts to Gold`, pct:Math.round(((pts-500)/500)*100), icon:'🥈' }
-    return { name:'Bronze', next:`${500-pts} pts to Silver`, pct:Math.round((pts/500)*100), icon:'🥉' }
+  function tierInfo(lifetimePts) {
+    const silver = (config && config.tier_silver) || 500
+    const gold   = (config && config.tier_gold)   || 1000
+    if (lifetimePts >= gold)   return { name:'Gold',   next:null,                                    pct:100,                                                       icon:'🥇' }
+    if (lifetimePts >= silver) return { name:'Silver', next:`${gold-lifetimePts} pts to Gold`,        pct:Math.round(((lifetimePts-silver)/(gold-silver))*100),       icon:'🥈' }
+    return                             { name:'Bronze', next:`${silver-lifetimePts} pts to Silver`,   pct:Math.round((lifetimePts/silver)*100),                       icon:'🥉' }
+  }
+
+  function tierRank(tierName) {
+    if (tierName === 'Gold')   return 2
+    if (tierName === 'Silver') return 1
+    return 0
   }
 
   function refUrl(code) { return `${BASE}/ref/${code}` }
@@ -339,7 +347,8 @@
     // ── HOME (logged in) ─────────────────────────────────────────────────
     if (v === 'home' && customer) {
       const pts = customer.points || 0
-      const tier = tierInfo(pts)
+      const lifetimePts = customer.lifetime_points || 0
+      const tier = tierInfo(lifetimePts)
       const refCode = customer.referral_code || ''
       const url = refUrl(refCode)
       const refPts = (config && config.referral_points) || 100
@@ -405,12 +414,24 @@
             }).join('')}
           </div>` : ''
         if (!offers.length) return codesHTML || '<p class="gp-msg" style="padding:20px 0">No rewards available yet — check back soon!</p>'
-        return codesHTML + offers.map(o => `
-          <div class="gp-offer">
-            <div class="gp-offer-name">${esc(o.name)}</div>
+        return codesHTML + offers.map(o => {
+          const minTier = o.min_tier || 'Bronze'
+          const tierLocked = tierRank(tier.name) < tierRank(minTier)
+          const canAfford = pts >= o.points_required
+          const tierBadge = minTier !== 'Bronze' ? `<span style="font-size:.7rem;background:rgba(255,255,255,.1);border-radius:4px;padding:2px 6px;margin-left:4px">${minTier==='Gold'?'🥇':'🥈'} ${minTier}+</span>` : ''
+          if (tierLocked) {
+            return `<div class="gp-offer" style="opacity:.55">
+              <div class="gp-offer-name">${esc(o.name)}${tierBadge}</div>
+              <div class="gp-offer-meta">${esc(o.description||'')} · <span style="color:#c47aff">${o.points_required} pts</span></div>
+              <button class="gp-redeem-btn" disabled>🔒 Reach ${esc(minTier)} to unlock</button>
+            </div>`
+          }
+          return `<div class="gp-offer">
+            <div class="gp-offer-name">${esc(o.name)}${tierBadge}</div>
             <div class="gp-offer-meta">${esc(o.description||'')} · <span style="color:#c47aff">${o.points_required} pts</span></div>
-            <button class="gp-redeem-btn" data-offer-id="${o.id}" ${pts<o.points_required?'disabled':''}>${pts>=o.points_required?'Redeem':`Need ${o.points_required-pts} more pts`}</button>
-          </div>`).join('') + '<div id="gp-code-area"></div>'
+            <button class="gp-redeem-btn" data-offer-id="${o.id}" ${canAfford?'':'disabled'}>${canAfford?'Redeem':`Need ${o.points_required-pts} more pts`}</button>
+          </div>`
+        }).join('') + '<div id="gp-code-area"></div>'
       }
 
       if (homeTab === 'offers') {
@@ -418,6 +439,9 @@
         const signupBonus = (config && config.signup_bonus) || 0
         const followPts = (config && config.follow_points) || 0
         const hasFollow = !!(config && config.social_follow_url)
+        const bronzeMult = (config && config.tier_bronze_multiplier) || 1
+        const silverMult = (config && config.tier_silver_multiplier) || 1.5
+        const goldMult   = (config && config.tier_gold_multiplier)   || 2
         const rows = [
           ['🛍️', 'Place an order', `${ptsPerDollar} pt${ptsPerDollar>1?'s':''} per $1 spent`],
           signupBonus > 0 ? ['👋', 'Sign up bonus', `+${signupBonus} pts (one time)`] : null,
@@ -433,6 +457,21 @@
                 <div class="gp-earn-label">${ico} ${label}</div>
                 <div class="gp-earn-pts" style="color:${c}">${pts}</div>
               </div>`).join('')}
+          </div>
+          <p style="font-weight:700;font-size:.9rem;margin-bottom:12px;margin-top:4px">Tier Multipliers</p>
+          <div class="gp-section" style="padding:8px 14px">
+            <div class="gp-earn-row">
+              <div class="gp-earn-label">🥉 Bronze</div>
+              <div class="gp-earn-pts" style="color:${c}">${bronzeMult}× points</div>
+            </div>
+            <div class="gp-earn-row">
+              <div class="gp-earn-label">🥈 Silver</div>
+              <div class="gp-earn-pts" style="color:${c}">${silverMult}× points</div>
+            </div>
+            <div class="gp-earn-row">
+              <div class="gp-earn-label">🥇 Gold</div>
+              <div class="gp-earn-pts" style="color:${c}">${goldMult}× points</div>
+            </div>
           </div>
         `
       }

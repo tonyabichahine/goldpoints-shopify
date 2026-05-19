@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -12,27 +13,36 @@ export async function POST(req: NextRequest) {
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, follow_points').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, follow_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const { data: customer } = await supabaseAdmin
-    .from('customers').select('id, points').eq('merchant_id', merchant.id).eq('email', email).single()
+    .from('customers').select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded').eq('merchant_id', merchant.id).eq('email', email).single()
   if (!customer) return NextResponse.json({ error: 'Account not found' }, { status: 404, headers: cors })
 
-  // Check if already claimed
   const { data: existing } = await supabaseAdmin
-    .from('point_transactions')
-    .select('id').eq('customer_id', customer.id).eq('type', 'earn_follow').single()
+    .from('point_transactions').select('id').eq('customer_id', customer.id).eq('type', 'earn_follow').single()
   if (existing) return NextResponse.json({ error: 'You have already claimed your follow reward.' }, { status: 400, headers: cors })
 
   const pts = merchant.follow_points || 50
-  const newPoints = customer.points + pts
+  const newLifetime = (customer.lifetime_points ?? 0) + pts
+  const newTier = getTier(newLifetime, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
 
-  await supabaseAdmin.from('customers').update({ points: newPoints }).eq('id', customer.id)
-  await supabaseAdmin.from('point_transactions').insert({
-    merchant_id: merchant.id, customer_id: customer.id,
-    type: 'earn_follow', points: pts, description: 'Followed on social media',
-  })
+  const { extraPoints, customerUpdates: bonusUpdates, transactions: bonusTxs } = buildUpgradeBonusData(
+    merchant.id, customer.id, customer.tier, newTier,
+    merchant.tier_silver_bonus ?? 0, merchant.tier_gold_bonus ?? 0,
+    customer.silver_bonus_awarded ?? false, customer.gold_bonus_awarded ?? false,
+  )
+
+  const newPoints = customer.points + pts + extraPoints
+
+  await Promise.all([
+    supabaseAdmin.from('customers').update({ points: newPoints, lifetime_points: newLifetime + extraPoints, tier: newTier, ...bonusUpdates }).eq('id', customer.id),
+    supabaseAdmin.from('point_transactions').insert([
+      { merchant_id: merchant.id, customer_id: customer.id, type: 'earn_follow', points: pts, description: 'Followed on social media' },
+      ...bonusTxs,
+    ]),
+  ])
 
   return NextResponse.json({ newPoints, pointsEarned: pts }, { headers: cors })
 }

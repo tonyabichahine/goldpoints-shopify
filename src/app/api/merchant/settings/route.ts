@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const body = await req.json()
-  const allowed = ['widget_primary_color', 'widget_btn_text_color', 'widget_position', 'widget_offset_bottom', 'widget_offset_side', 'widget_title', 'points_per_dollar', 'signup_bonus', 'birthday_bonus', 'social_follow_url', 'follow_points', 'referral_points', 'tier_silver', 'tier_gold']
+  const allowed = ['widget_primary_color', 'widget_btn_text_color', 'widget_position', 'widget_offset_bottom', 'widget_offset_side', 'widget_title', 'points_per_dollar', 'signup_bonus', 'birthday_bonus', 'social_follow_url', 'follow_points', 'referral_points', 'tier_silver', 'tier_gold', 'tier_bronze_multiplier', 'tier_silver_multiplier', 'tier_gold_multiplier', 'tier_silver_bonus', 'tier_gold_bonus']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) if (body[key] !== undefined) updates[key] = body[key]
 

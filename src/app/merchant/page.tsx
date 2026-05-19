@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
@@ -109,7 +109,7 @@ function MerchantDashboardInner() {
   const [customers, setCustomers] = useState<any[]>([])
   const [offers, setOffers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  const [newOffer, setNewOffer] = useState({ name: '', description: '', points_required: 500, offer_type: 'percentage', offer_value: '10' })
+  const [newOffer, setNewOffer] = useState({ name: '', description: '', points_required: 500, offer_type: 'percentage', offer_value: '10', min_tier: 'Bronze' })
   const [connectDomain, setConnectDomain] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [currPw, setCurrPw] = useState('')
@@ -219,7 +219,7 @@ function MerchantDashboardInner() {
   async function addOffer() {
     const r = await fetch('/api/merchant/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newOffer) })
     const data = await r.json()
-    if (!data.error) { setOffers(prev => [...prev, data]); setNewOffer({ name: '', description: '', points_required: 500, offer_type: 'percentage', offer_value: '10' }) }
+    if (!data.error) { setOffers(prev => [...prev, data]); setNewOffer({ name: '', description: '', points_required: 500, offer_type: 'percentage', offer_value: '10', min_tier: 'Bronze' }) }
   }
 
   async function deleteOffer(id: string) {
@@ -470,12 +470,27 @@ function MerchantDashboardInner() {
                   <option value="fixed">Fixed $ Off</option>
                 </select>
                 <input placeholder="Value (e.g. 10 for 10%)" value={newOffer.offer_value} onChange={e => setNewOffer(p => ({...p, offer_value: e.target.value}))} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                <select value={newOffer.min_tier} onChange={e => setNewOffer(p => ({...p, min_tier: e.target.value}))} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
+                  <option value="Bronze">All tiers (Bronze+)</option>
+                  <option value="Silver">🥈 Silver+ only</option>
+                  <option value="Gold">🥇 Gold only</option>
+                </select>
               </div>
               <button onClick={addOffer} className="mt-4 bg-purple-600 hover:bg-purple-500 px-5 py-2 rounded-lg text-sm font-semibold">Add Offer</button>
             </div>
             <div className="space-y-3">{offers.map((o: any) => (
               <div key={o.id} className="bg-[#16162a] border border-white/10 rounded-xl p-4 flex items-center justify-between">
-                <div><div className="font-semibold">{o.name}</div><div className="text-sm text-gray-400">{o.description} · <span className="text-purple-400">{o.points_required} pts</span> · {o.offer_type === 'shipping' ? 'Free Shipping' : `${o.offer_value}${o.offer_type==='percentage'?'% off':'$ off'}`}</div></div>
+                <div>
+                  <div className="font-semibold flex items-center gap-2">
+                    {o.name}
+                    {o.min_tier && o.min_tier !== 'Bronze' && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${o.min_tier === 'Gold' ? 'bg-yellow-900/40 text-yellow-400' : 'bg-gray-700/40 text-gray-300'}`}>
+                        {o.min_tier === 'Gold' ? '🥇' : '🥈'} {o.min_tier}+ only
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-400">{o.description} · <span className="text-purple-400">{o.points_required} pts</span> · {o.offer_type === 'shipping' ? 'Free Shipping' : `${o.offer_value}${o.offer_type==='percentage'?'% off':'$ off'}`}</div>
+                </div>
                 <button onClick={() => deleteOffer(o.id)} className="text-red-400 hover:text-red-300 text-sm">Remove</button>
               </div>
             ))}</div>
@@ -505,6 +520,36 @@ function MerchantDashboardInner() {
                 <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-xs text-gray-500 mb-3">Points Multiplier — how many times the base earn rate each tier receives on purchases.</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥉 Bronze multiplier</label>
+                      <input type="number" step="0.1" value={merchant.tier_bronze_multiplier ?? 1.0} onChange={e => setMerchant(p => p ? {...p, tier_bronze_multiplier: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥈 Silver multiplier</label>
+                      <input type="number" step="0.1" value={merchant.tier_silver_multiplier ?? 1.5} onChange={e => setMerchant(p => p ? {...p, tier_silver_multiplier: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥇 Gold multiplier</label>
+                      <input type="number" step="0.1" value={merchant.tier_gold_multiplier ?? 2.0} onChange={e => setMerchant(p => p ? {...p, tier_gold_multiplier: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-xs text-gray-500 mb-3">Tier Upgrade Bonus — one-time bonus points awarded the first time a customer reaches Silver or Gold.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥈 Silver upgrade bonus (pts)</label>
+                      <input type="number" value={merchant.tier_silver_bonus ?? 0} onChange={e => setMerchant(p => p ? {...p, tier_silver_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" placeholder="0 = disabled" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥇 Gold upgrade bonus (pts)</label>
+                      <input type="number" value={merchant.tier_gold_bonus ?? 0} onChange={e => setMerchant(p => p ? {...p, tier_gold_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" placeholder="0 = disabled" />
+                    </div>
+                  </div>
+                </div>
                 <div className="border-t border-white/10 pt-4">
                   <p className="text-xs text-gray-500 mb-3">Loyalty Tiers — minimum points to reach each tier. Changes apply to new transactions.</p>
                   <div className="grid grid-cols-2 gap-4">

@@ -64,3 +64,27 @@ export function getTier(points: number, silverThreshold = 500, goldThreshold = 1
   if (points >= silverThreshold) return 'Silver'
   return 'Bronze'
 }
+
+export function buildUpgradeBonusData(
+  merchantId: string, customerId: string,
+  oldTier: string, newTier: string,
+  silverBonus: number, goldBonus: number,
+  silverBonusAwarded: boolean, goldBonusAwarded: boolean,
+) {
+  const customerUpdates: Record<string, unknown> = {}
+  const transactions: Array<Record<string, unknown>> = []
+  let extraPoints = 0
+  if (newTier !== oldTier) {
+    if ((newTier === 'Silver' || newTier === 'Gold') && oldTier === 'Bronze' && !silverBonusAwarded && silverBonus > 0) {
+      extraPoints += silverBonus
+      customerUpdates.silver_bonus_awarded = true
+      transactions.push({ merchant_id: merchantId, customer_id: customerId, type: 'earn_tier_bonus', points: silverBonus, description: 'Silver tier upgrade bonus' })
+    }
+    if (newTier === 'Gold' && !goldBonusAwarded && goldBonus > 0) {
+      extraPoints += goldBonus
+      customerUpdates.gold_bonus_awarded = true
+      transactions.push({ merchant_id: merchantId, customer_id: customerId, type: 'earn_tier_bonus', points: goldBonus, description: 'Gold tier upgrade bonus' })
+    }
+  }
+  return { extraPoints, customerUpdates, transactions }
+}

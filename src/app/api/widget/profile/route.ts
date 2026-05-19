@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
 import bcrypt from 'bcryptjs'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, signup_bonus, referral_points').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, signup_bonus, referral_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const { data: existing } = await supabaseAdmin
@@ -35,34 +36,63 @@ export async function POST(req: NextRequest) {
   const referral_code = genCode()
   const password_hash = password ? await bcrypt.hash(password, 10) : null
 
-  // Check if referred by someone
+  // Referral: credit the referrer
   let referred_by = null
   if (gp_ref) {
     const { data: referrer } = await supabaseAdmin
-      .from('customers').select('id, points').eq('referral_code', gp_ref).eq('merchant_id', merchant.id).single()
+      .from('customers').select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded').eq('referral_code', gp_ref).eq('merchant_id', merchant.id).single()
     if (referrer) {
       referred_by = referrer.id
       const refPts = merchant.referral_points || 100
-      await supabaseAdmin.from('customers').update({ points: referrer.points + refPts }).eq('id', referrer.id)
-      await supabaseAdmin.from('point_transactions').insert({
-        merchant_id: merchant.id, customer_id: referrer.id,
-        type: 'earn_referral', points: refPts, description: `Referral bonus: ${email} joined`,
-      })
+      const refNewLifetime = (referrer.lifetime_points ?? 0) + refPts
+      const refNewTier = getTier(refNewLifetime, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
+      const { extraPoints: refExtra, customerUpdates: refBonusUpdates, transactions: refBonusTxs } = buildUpgradeBonusData(
+        merchant.id, referrer.id, referrer.tier, refNewTier,
+        merchant.tier_silver_bonus ?? 0, merchant.tier_gold_bonus ?? 0,
+        referrer.silver_bonus_awarded ?? false, referrer.gold_bonus_awarded ?? false,
+      )
+      await Promise.all([
+        supabaseAdmin.from('customers').update({
+          points: referrer.points + refPts + refExtra,
+          lifetime_points: refNewLifetime + refExtra,
+          tier: refNewTier,
+          ...refBonusUpdates,
+        }).eq('id', referrer.id),
+        supabaseAdmin.from('point_transactions').insert([
+          { merchant_id: merchant.id, customer_id: referrer.id, type: 'earn_referral', points: refPts, description: `Referral bonus: ${email} joined` },
+          ...refBonusTxs,
+        ]),
+      ])
     }
   }
 
+  // New customer: tier based on signup bonus
+  const initialTier = getTier(bonus, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
   const { data: customer, error } = await supabaseAdmin
     .from('customers')
-    .insert({ merchant_id: merchant.id, email: email.toLowerCase().trim(), name: name || email, birthday: birthday || null, marketing_consent: !!marketing_consent, password_hash, points: bonus, tier: 'Bronze', referral_code, referred_by })
+    .insert({ merchant_id: merchant.id, email: email.toLowerCase().trim(), name: name || email, birthday: birthday || null, marketing_consent: !!marketing_consent, password_hash, points: bonus, lifetime_points: bonus, tier: initialTier, referral_code, referred_by })
     .select().single()
 
   if (error) return NextResponse.json({ error: 'Failed to save profile' }, { status: 500, headers: cors })
 
+  const txsToInsert: Array<Record<string, unknown>> = []
   if (bonus > 0) {
-    await supabaseAdmin.from('point_transactions').insert({
-      merchant_id: merchant.id, customer_id: customer.id,
-      type: 'earn_signup', points: bonus, description: 'Welcome bonus',
-    })
+    txsToInsert.push({ merchant_id: merchant.id, customer_id: customer.id, type: 'earn_signup', points: bonus, description: 'Welcome bonus' })
+  }
+
+  // Check if signup bonus triggers a tier upgrade bonus
+  const { extraPoints, customerUpdates: bonusUpdates, transactions: bonusTxs } = buildUpgradeBonusData(
+    merchant.id, customer.id, 'Bronze', initialTier,
+    merchant.tier_silver_bonus ?? 0, merchant.tier_gold_bonus ?? 0,
+    false, false,
+  )
+  if (extraPoints > 0) {
+    await supabaseAdmin.from('customers').update({ points: bonus + extraPoints, lifetime_points: bonus + extraPoints, ...bonusUpdates }).eq('id', customer.id)
+    txsToInsert.push(...bonusTxs)
+  }
+
+  if (txsToInsert.length > 0) {
+    await supabaseAdmin.from('point_transactions').insert(txsToInsert)
   }
 
   return NextResponse.json({ customer, isNew: true }, { headers: cors })
