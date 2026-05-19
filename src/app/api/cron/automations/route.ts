@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, sendFlowEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +9,10 @@ function getNextNodeId(nodeId: string, edges: any[], handleId?: string): string 
   return edge?.target || ''
 }
 
-function evaluateCondition(data: any, customer: any): boolean {
+function evaluateCondition(data: any, customer: any, enrollment?: any): boolean {
+  if (data.conditionType === 'email_clicked') {
+    return !!enrollment?.last_email_click_at
+  }
   const fieldMap: Record<string, number | string> = {
     points: customer.points || 0,
     lifetime_points: customer.lifetime_points || 0,
@@ -31,7 +34,7 @@ async function processEnrollment(enrollment: any) {
   const [flowRes, customerRes, merchantRes] = await Promise.all([
     supabaseAdmin.from('automation_flows').select('nodes, edges').eq('id', enrollment.flow_id).single(),
     supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points').eq('id', enrollment.customer_id).single(),
-    supabaseAdmin.from('merchants').select('store_name').eq('id', enrollment.merchant_id).single(),
+    supabaseAdmin.from('merchants').select('store_name, shopify_domain').eq('id', enrollment.merchant_id).single(),
   ])
 
   if (!flowRes.data || !customerRes.data) {
@@ -43,6 +46,7 @@ async function processEnrollment(enrollment: any) {
   const edges: any[] = flowRes.data.edges || []
   const customer = { ...customerRes.data }
   const storeName = merchantRes.data?.store_name || 'Our Store'
+  const shopifyDomain = merchantRes.data?.shopify_domain || ''
 
   const sub = (s: string) => (s || '')
     .replace(/\{\{name\}\}/g, (customer.name || customer.email).split(' ')[0])
@@ -58,7 +62,11 @@ async function processEnrollment(enrollment: any) {
     if (node.type === 'end') { await supabaseAdmin.from('automation_enrollments').update({ status: 'completed' }).eq('id', enrollment.id); return }
 
     if (node.type === 'email') {
-      await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
+      if (shopifyDomain) {
+        await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain)
+      } else {
+        await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
+      }
       currentNodeId = getNextNodeId(node.id, edges)
     } else if (node.type === 'wait') {
       const ms = (node.data.unit === 'hours' ? 3600000 : 86400000) * (node.data.amount || 1)
@@ -69,7 +77,7 @@ async function processEnrollment(enrollment: any) {
       }).eq('id', enrollment.id)
       return
     } else if (node.type === 'condition') {
-      const result = evaluateCondition(node.data, customer)
+      const result = evaluateCondition(node.data, customer, enrollment)
       currentNodeId = getNextNodeId(node.id, edges, result ? 'true' : 'false')
     } else if (node.type === 'addPoints') {
       const pts = node.data.points || 0
@@ -152,7 +160,7 @@ export async function GET(req: NextRequest) {
 
   const { data: enrollments } = await supabaseAdmin
     .from('automation_enrollments')
-    .select('id, flow_id, customer_id, merchant_id, current_node_id')
+    .select('id, flow_id, customer_id, merchant_id, current_node_id, last_email_click_at')
     .eq('status', 'active')
     .lte('next_run_at', new Date().toISOString())
     .limit(100)

@@ -24,5 +24,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const enrollmentId = searchParams.get('eid')
+  if (enrollmentId) {
+    void supabaseAdmin.from('automation_enrollments')
+      .update({ last_email_click_at: new Date().toISOString() })
+      .eq('id', enrollmentId)
+  }
+
   return NextResponse.redirect(safeUrl)
 }

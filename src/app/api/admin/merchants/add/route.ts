@@ -5,6 +5,71 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+function buildDefaultFlows(merchantId: string) {
+  return [
+    {
+      merchant_id: merchantId, name: 'Welcome Series', trigger: 'signup', active: true, allow_reenroll: false,
+      nodes: [
+        { id: 'trigger-1', type: 'trigger', position: { x: 250, y: 50 }, data: { triggerType: 'signup' } },
+        { id: 'email-1', type: 'email', position: { x: 250, y: 180 }, data: { subject: 'Welcome to {{store}}! Your rewards journey starts now', body: 'Hi {{name}},\n\nWelcome to {{store}} — you\'ve just joined our loyalty rewards program!\n\nEvery purchase earns you points. You already have {{points}} points to start. Here\'s what\'s ahead:\n\n• Earn points on every order\n• Reach Silver tier for 1.5x point multipliers\n• Reach Gold tier for 2x points and exclusive perks\n• Redeem points for discounts and free products\n\nYour current tier is {{tier}}. Keep shopping to unlock bigger rewards!' } },
+        { id: 'wait-1', type: 'wait', position: { x: 250, y: 320 }, data: { amount: 3, unit: 'days' } },
+        { id: 'condition-1', type: 'condition', position: { x: 250, y: 460 }, data: { conditionType: 'email_clicked' } },
+        { id: 'end-1', type: 'end', position: { x: 100, y: 590 }, data: {} },
+        { id: 'email-2', type: 'email', position: { x: 400, y: 590 }, data: { subject: 'Your {{points}} points are waiting, {{name}}!', body: 'Hi {{name}},\n\nWe noticed you haven\'t had a chance to shop at {{store}} since joining — just wanted to check in!\n\nYou have {{points}} points ready to use. Even your next small purchase brings you closer to a free reward.\n\nWe\'d love to see you come back. Here\'s what\'s in store for you:' } },
+        { id: 'end-2', type: 'end', position: { x: 400, y: 730 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 'trigger-1', target: 'email-1' },
+        { id: 'e2', source: 'email-1', target: 'wait-1' },
+        { id: 'e3', source: 'wait-1', target: 'condition-1' },
+        { id: 'e4', source: 'condition-1', target: 'end-1', sourceHandle: 'true' },
+        { id: 'e5', source: 'condition-1', target: 'email-2', sourceHandle: 'false' },
+        { id: 'e6', source: 'email-2', target: 'end-2' },
+      ],
+    },
+    {
+      merchant_id: merchantId, name: 'Silver Milestone', trigger: 'tier_silver', active: true, allow_reenroll: false,
+      nodes: [
+        { id: 'trigger-1', type: 'trigger', position: { x: 250, y: 50 }, data: { triggerType: 'tier_silver' } },
+        { id: 'email-1', type: 'email', position: { x: 250, y: 180 }, data: { subject: 'You\'ve reached Silver status at {{store}}! 🥈', body: 'Hi {{name}},\n\nCongratulations — you\'ve officially reached Silver status at {{store}}! 🥈\n\nHere\'s what you\'ve unlocked:\n\n• 1.5x points multiplier on every purchase\n• Early access to exclusive member offers\n• Priority customer support\n\nYou currently have {{points}} points. Keep earning to reach Gold status for even more exclusive perks.\n\nThank you for being a loyal customer — come enjoy your Silver rewards:' } },
+        { id: 'wait-1', type: 'wait', position: { x: 250, y: 320 }, data: { amount: 5, unit: 'days' } },
+        { id: 'condition-1', type: 'condition', position: { x: 250, y: 460 }, data: { conditionType: 'email_clicked' } },
+        { id: 'end-1', type: 'end', position: { x: 100, y: 590 }, data: {} },
+        { id: 'email-2', type: 'email', position: { x: 400, y: 590 }, data: { subject: 'Unlock your Silver rewards at {{store}}, {{name}}! 🥈', body: 'Hi {{name}},\n\nJust a reminder — you\'re now a Silver member at {{store}} and your exclusive benefits are ready!\n\nYour {{points}} points are waiting, plus you now earn 1.5x points on every purchase. Your rewards are growing faster than ever.\n\nDon\'t let your Silver status go to waste — come shop and enjoy your upgraded membership:' } },
+        { id: 'end-2', type: 'end', position: { x: 400, y: 730 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 'trigger-1', target: 'email-1' },
+        { id: 'e2', source: 'email-1', target: 'wait-1' },
+        { id: 'e3', source: 'wait-1', target: 'condition-1' },
+        { id: 'e4', source: 'condition-1', target: 'end-1', sourceHandle: 'true' },
+        { id: 'e5', source: 'condition-1', target: 'email-2', sourceHandle: 'false' },
+        { id: 'e6', source: 'email-2', target: 'end-2' },
+      ],
+    },
+    {
+      merchant_id: merchantId, name: 'Gold VIP Welcome', trigger: 'tier_gold', active: true, allow_reenroll: false,
+      nodes: [
+        { id: 'trigger-1', type: 'trigger', position: { x: 250, y: 50 }, data: { triggerType: 'tier_gold' } },
+        { id: 'email-1', type: 'email', position: { x: 250, y: 180 }, data: { subject: 'You\'re a Gold VIP at {{store}} now! 🥇', body: 'Hi {{name}},\n\nWow — you\'ve reached Gold VIP status at {{store}}! 🥇 You\'re among our most loyal customers and we want to show our appreciation.\n\nAs a Gold VIP, you now enjoy:\n\n• 2x points on every purchase\n• Access to exclusive Gold-only offers\n• First access to new products and sales\n• Premium customer support\n\nYou currently have {{points}} points — that\'s incredible. Keep shopping and watch your rewards grow even faster.\n\nThis one\'s for you, {{name}}:' } },
+        { id: 'wait-1', type: 'wait', position: { x: 250, y: 320 }, data: { amount: 7, unit: 'days' } },
+        { id: 'condition-1', type: 'condition', position: { x: 250, y: 460 }, data: { conditionType: 'email_clicked' } },
+        { id: 'end-1', type: 'end', position: { x: 100, y: 590 }, data: {} },
+        { id: 'email-2', type: 'email', position: { x: 400, y: 590 }, data: { subject: 'Your exclusive Gold benefits are ready, {{name}}! 🥇', body: 'Hi {{name}},\n\nWe sent you a Gold VIP welcome email a week ago and wanted to follow up — your exclusive member benefits are still waiting at {{store}}!\n\nAs a Gold VIP, you earn 2x points on every order. With {{points}} points already in your account, you\'re well on your way to even bigger rewards.\n\nCome shop and see what\'s new:' } },
+        { id: 'end-2', type: 'end', position: { x: 400, y: 730 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 'trigger-1', target: 'email-1' },
+        { id: 'e2', source: 'email-1', target: 'wait-1' },
+        { id: 'e3', source: 'wait-1', target: 'condition-1' },
+        { id: 'e4', source: 'condition-1', target: 'end-1', sourceHandle: 'true' },
+        { id: 'e5', source: 'condition-1', target: 'email-2', sourceHandle: 'false' },
+        { id: 'e6', source: 'email-2', target: 'end-2' },
+      ],
+    },
+  ]
+}
+
 export async function POST(req: NextRequest) {
   const pw = req.cookies.get('admin_session')?.value
   if (pw !== (process.env.ADMIN_PASSWORD || 'admin123')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,6 +86,9 @@ export async function POST(req: NextRequest) {
     .select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Seed default automation flows
+  try { await supabaseAdmin.from('automation_flows').insert(buildDefaultFlows(data.id)) } catch {}
 
   // Send welcome email
   const emailResult = await resend.emails.send({
