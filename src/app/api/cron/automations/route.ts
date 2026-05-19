@@ -138,8 +138,13 @@ async function enrollBirthdayCustomers() {
 }
 
 export async function GET(req: NextRequest) {
-  if (process.env.VERCEL === '1' && req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const secret = process.env.CRON_SECRET
+  if (process.env.VERCEL === '1' && secret) {
+    const headerAuth = req.headers.get('authorization') === `Bearer ${secret}`
+    const queryAuth = new URL(req.url).searchParams.get('secret') === secret
+    if (!headerAuth && !queryAuth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   }
 
   await enrollInactiveCustomers().catch(() => {})
