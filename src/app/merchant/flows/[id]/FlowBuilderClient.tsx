@@ -18,7 +18,6 @@ import {
   type Connection,
   type NodeProps,
 } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
 
 // ─── Node Components ──────────────────────────────────────────────────────────
 
@@ -230,6 +229,16 @@ function FlowBuilder() {
   const router = useRouter()
   const params = useParams()
   const flowId = params.id as string
+
+  useEffect(() => {
+    if (!document.getElementById('xyflow-styles')) {
+      const link = document.createElement('link')
+      link.id = 'xyflow-styles'
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/@xyflow/react@12.10.2/dist/style.css'
+      document.head.appendChild(link)
+    }
+  }, [])
 
   const [flowName, setFlowName] = useState('Untitled Flow')
   const [trigger, setTrigger] = useState('signup')
