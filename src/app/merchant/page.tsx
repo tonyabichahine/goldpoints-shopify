@@ -105,7 +105,7 @@ function MerchantDashboardInner() {
   const router = useRouter()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'widget' | 'install' | 'account'>('overview')
+  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings'>('overview')
   const [customers, setCustomers] = useState<any[]>([])
   const [offers, setOffers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
@@ -191,8 +191,8 @@ function MerchantDashboardInner() {
       pageContext += ` Viewing ${customers.length} customers. First few: ${customers.slice(0, 3).map(c => `${c.name} (${c.points} pts, ${c.tier})`).join(', ')}.`
     } else if (tab === 'offers' && offers.length > 0) {
       pageContext += ` Viewing ${offers.length} offers: ${offers.map((o: any) => `${o.name} (${o.points_required} pts)`).join(', ')}.`
-    } else if (tab === 'widget' && merchant) {
-      pageContext += ` Viewing widget settings: color ${merchant.widget_primary_color}, position ${merchant.widget_position}, ${merchant.points_per_dollar} pts/$1, ${merchant.signup_bonus} pt sign-up bonus.`
+    } else if (tab === 'settings' && merchant) {
+      pageContext += ` Viewing settings: color ${merchant.widget_primary_color}, position ${merchant.widget_position}, ${merchant.points_per_dollar} pts/$1, ${merchant.signup_bonus} pt sign-up bonus.`
     }
 
     const newMessages: { role: 'user' | 'ai'; content: string }[] = [...aiChat.messages, { role: 'user', content: msg }]
@@ -270,7 +270,7 @@ function MerchantDashboardInner() {
 
       <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
         <div className="flex gap-2 flex-wrap">
-          {(['overview','customers','offers','widget','install','account'] as const).map(t => (
+          {(['overview','customers','offers','settings'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
           ))}
         </div>
@@ -482,117 +482,121 @@ function MerchantDashboardInner() {
           </div>
         )}
 
-        {tab === 'widget' && merchant && (
-          <div>
-            <h2 className="text-2xl font-bold text-purple-400 mb-6">Widget Settings</h2>
-            <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
-              <div><label className="block text-sm text-gray-400 mb-1">Widget Title</label><input value={merchant.widget_title || ''} onChange={e => setMerchant(p => p ? {...p, widget_title: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Button Color</label><input type="color" value={merchant.widget_primary_color || '#6c3fff'} onChange={e => setMerchant(p => p ? {...p, widget_primary_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Button Text Color</label><input type="color" value={merchant.widget_btn_text_color || '#ffffff'} onChange={e => setMerchant(p => p ? {...p, widget_btn_text_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Position</label>
-                <select value={merchant.widget_position || 'bottom-right'} onChange={e => setMerchant(p => p ? {...p, widget_position: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
-                  <option value="bottom-right">Bottom Right</option>
-                  <option value="bottom-left">Bottom Left</option>
-                  <option value="top-right">Top Right</option>
-                  <option value="top-left">Top Left</option>
-                </select>
-              </div>
-              <div><label className="block text-sm text-gray-400 mb-1">Vertical spacing (px)</label><input type="number" value={merchant.widget_offset_bottom ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_bottom: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-gray-500 mb-3">Loyalty Tiers — minimum points to reach each tier. Changes apply to new transactions.</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">🥈 Silver threshold (pts)</label>
-                    <input type="number" value={merchant.tier_silver ?? 500} onChange={e => setMerchant(p => p ? {...p, tier_silver: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">🥇 Gold threshold (pts)</label>
-                    <input type="number" value={merchant.tier_gold ?? 1000} onChange={e => setMerchant(p => p ? {...p, tier_gold: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
-                  </div>
-                </div>
-              </div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-gray-500 mb-3">Referral Program — points awarded to the referrer when a friend joins.</p>
-                <div><label className="block text-sm text-gray-400 mb-1">Referral bonus points</label><input type="number" value={merchant.referral_points || 100} onChange={e => setMerchant(p => p ? {...p, referral_points: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
-              </div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-gray-500 mb-3">Social Follow Reward — leave blank to hide it in the widget.</p>
-                <div><label className="block text-sm text-gray-400 mb-1">Social page URL</label><input value={merchant.social_follow_url || ''} onChange={e => setMerchant(p => p ? {...p, social_follow_url: e.target.value} : p)} placeholder="https://facebook.com/yourstore" className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
-                <div className="mt-3"><label className="block text-sm text-gray-400 mb-1">Points for following</label><input type="number" value={merchant.follow_points || 50} onChange={e => setMerchant(p => p ? {...p, follow_points: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
-              </div>
-              <button onClick={saveSettings} disabled={saving} className="bg-gradient-to-r from-purple-700 to-purple-500 px-6 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">{saving ? 'Saving...' : 'Save Settings'}</button>
-            </div>
-          </div>
-        )}
+        {tab === 'settings' && merchant && (
+          <div className="space-y-8">
+            <h2 className="text-2xl font-bold text-purple-400">Settings</h2>
 
-        {tab === 'install' && (
-          <div>
-            <h2 className="text-2xl font-bold text-purple-400 mb-6">Install on Your Shopify Store</h2>
-            {!isConnected && (
-              <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-4 mb-6 text-yellow-300 text-sm">
-                Connect your Shopify store first using the yellow banner above.
-              </div>
-            )}
-            <div className="space-y-6">
-              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
-                <h3 className="font-semibold mb-2">1. Copy this snippet</h3>
-                <pre className="bg-[#0f0f1a] p-4 rounded-lg text-xs text-green-400 overflow-x-auto whitespace-pre-wrap break-all">{widgetSnippet}</pre>
-                <button onClick={() => navigator.clipboard.writeText(widgetSnippet)} className="mt-3 text-sm bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg">Copy Code</button>
-              </div>
-              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
-                <h3 className="font-semibold mb-3">2. Add to your Shopify theme</h3>
-                <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
-                  <li>In Shopify Admin, go to <strong>Online Store → Themes</strong></li>
-                  <li>Click <strong>Edit code</strong> on your active theme</li>
-                  <li>Open <strong>theme.liquid</strong></li>
-                  <li>Paste the snippet just before the <code className="text-purple-400">&lt;/body&gt;</code> tag</li>
-                  <li>Save — the widget will appear on every page of your store</li>
-                </ol>
-              </div>
-              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
-                <h3 className="font-semibold mb-3">3. Set up the orders webhook</h3>
-                <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
-                  <li>In Shopify Admin, go to <strong>Settings → Notifications → Webhooks</strong></li>
-                  <li>Click <strong>Create webhook</strong></li>
-                  <li>Event: <strong>Order creation</strong>, Format: <strong>JSON</strong></li>
-                  <li>URL: <code className="text-purple-400 break-all">https://goldpoints-shopify.vercel.app/api/webhooks/orders</code></li>
-                  <li>Save</li>
-                </ol>
+            {/* Widget */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-200 mb-4">Widget</h3>
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
+                <div><label className="block text-sm text-gray-400 mb-1">Widget Title</label><input value={merchant.widget_title || ''} onChange={e => setMerchant(p => p ? {...p, widget_title: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Button Color</label><input type="color" value={merchant.widget_primary_color || '#6c3fff'} onChange={e => setMerchant(p => p ? {...p, widget_primary_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Button Text Color</label><input type="color" value={merchant.widget_btn_text_color || '#ffffff'} onChange={e => setMerchant(p => p ? {...p, widget_btn_text_color: e.target.value} : p)} className="h-10 w-20 rounded cursor-pointer bg-transparent border-0" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Position</label>
+                  <select value={merchant.widget_position || 'bottom-right'} onChange={e => setMerchant(p => p ? {...p, widget_position: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
+                    <option value="bottom-right">Bottom Right</option>
+                    <option value="bottom-left">Bottom Left</option>
+                    <option value="top-right">Top Right</option>
+                    <option value="top-left">Top Left</option>
+                  </select>
+                </div>
+                <div><label className="block text-sm text-gray-400 mb-1">Vertical spacing (px)</label><input type="number" value={merchant.widget_offset_bottom ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_bottom: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-xs text-gray-500 mb-3">Loyalty Tiers — minimum points to reach each tier. Changes apply to new transactions.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥈 Silver threshold (pts)</label>
+                      <input type="number" value={merchant.tier_silver ?? 500} onChange={e => setMerchant(p => p ? {...p, tier_silver: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">🥇 Gold threshold (pts)</label>
+                      <input type="number" value={merchant.tier_gold ?? 1000} onChange={e => setMerchant(p => p ? {...p, tier_gold: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-xs text-gray-500 mb-3">Referral Program — points awarded to the referrer when a friend joins.</p>
+                  <div><label className="block text-sm text-gray-400 mb-1">Referral bonus points</label><input type="number" value={merchant.referral_points || 100} onChange={e => setMerchant(p => p ? {...p, referral_points: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+                </div>
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-xs text-gray-500 mb-3">Social Follow Reward — leave blank to hide it in the widget.</p>
+                  <div><label className="block text-sm text-gray-400 mb-1">Social page URL</label><input value={merchant.social_follow_url || ''} onChange={e => setMerchant(p => p ? {...p, social_follow_url: e.target.value} : p)} placeholder="https://facebook.com/yourstore" className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
+                  <div className="mt-3"><label className="block text-sm text-gray-400 mb-1">Points for following</label><input type="number" value={merchant.follow_points || 50} onChange={e => setMerchant(p => p ? {...p, follow_points: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+                </div>
+                <button onClick={saveSettings} disabled={saving} className="bg-gradient-to-r from-purple-700 to-purple-500 px-6 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">{saving ? 'Saving...' : 'Save Settings'}</button>
               </div>
             </div>
-          </div>
-        )}
-        {tab === 'account' && (
-          <div className="max-w-md">
-            <h2 className="text-2xl font-bold text-purple-400 mb-6">Account</h2>
-            <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 mb-4">
-              <p className="text-sm text-gray-400 mb-1">Logged in as</p>
-              <p className="font-semibold">{merchant.email}</p>
+
+            {/* Install */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-200 mb-4">Install</h3>
+              {!isConnected && (
+                <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-4 mb-4 text-yellow-300 text-sm">
+                  Connect your Shopify store first using the yellow banner above.
+                </div>
+              )}
+              <div className="space-y-4">
+                <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
+                  <h4 className="font-semibold mb-2">1. Copy this snippet</h4>
+                  <pre className="bg-[#0f0f1a] p-4 rounded-lg text-xs text-green-400 overflow-x-auto whitespace-pre-wrap break-all">{widgetSnippet}</pre>
+                  <button onClick={() => navigator.clipboard.writeText(widgetSnippet)} className="mt-3 text-sm bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg">Copy Code</button>
+                </div>
+                <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
+                  <h4 className="font-semibold mb-3">2. Add to your Shopify theme</h4>
+                  <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
+                    <li>In Shopify Admin, go to <strong>Online Store → Themes</strong></li>
+                    <li>Click <strong>Edit code</strong> on your active theme</li>
+                    <li>Open <strong>theme.liquid</strong></li>
+                    <li>Paste the snippet just before the <code className="text-purple-400">&lt;/body&gt;</code> tag</li>
+                    <li>Save — the widget will appear on every page of your store</li>
+                  </ol>
+                </div>
+                <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
+                  <h4 className="font-semibold mb-3">3. Set up the orders webhook</h4>
+                  <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
+                    <li>In Shopify Admin, go to <strong>Settings → Notifications → Webhooks</strong></li>
+                    <li>Click <strong>Create webhook</strong></li>
+                    <li>Event: <strong>Order creation</strong>, Format: <strong>JSON</strong></li>
+                    <li>URL: <code className="text-purple-400 break-all">https://goldpoints-shopify.vercel.app/api/webhooks/orders</code></li>
+                    <li>Save</li>
+                  </ol>
+                </div>
+              </div>
             </div>
-            <div className="bg-[#16162a] border border-white/10 rounded-xl p-6">
-              <h3 className="font-semibold mb-4">Change Password</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Current password</label>
-                  <input type="password" value={currPw} onChange={e => setCurrPw(e.target.value)} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500" />
+
+            {/* Account */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-200 mb-4">Account</h3>
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 mb-4">
+                <p className="text-sm text-gray-400 mb-1">Logged in as</p>
+                <p className="font-semibold">{merchant.email}</p>
+              </div>
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 max-w-md">
+                <h4 className="font-semibold mb-4">Change Password</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Current password</label>
+                    <input type="password" value={currPw} onChange={e => setCurrPw(e.target.value)} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">New password</label>
+                    <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500" />
+                  </div>
+                  {pwMsg && <p className={`text-xs ${pwMsg.includes('changed') ? 'text-green-400' : 'text-red-400'}`}>{pwMsg}</p>}
+                  <button disabled={pwSaving} onClick={async () => {
+                    setPwSaving(true); setPwMsg('')
+                    const r = await fetch('/api/merchant/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: currPw, new_password: newPw }) })
+                    const d = await r.json()
+                    if (!r.ok) { setPwMsg(d.error); } else { setPwMsg('Password changed successfully!'); setCurrPw(''); setNewPw('') }
+                    setPwSaving(false)
+                  }} className="w-full bg-gradient-to-r from-purple-700 to-purple-500 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">
+                    {pwSaving ? 'Saving...' : 'Change Password'}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">New password</label>
-                  <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="••••••••" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500" />
-                </div>
-                {pwMsg && <p className={`text-xs ${pwMsg.includes('changed') ? 'text-green-400' : 'text-red-400'}`}>{pwMsg}</p>}
-                <button disabled={pwSaving} onClick={async () => {
-                  setPwSaving(true); setPwMsg('')
-                  const r = await fetch('/api/merchant/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: currPw, new_password: newPw }) })
-                  const d = await r.json()
-                  if (!r.ok) { setPwMsg(d.error); } else { setPwMsg('Password changed successfully!'); setCurrPw(''); setNewPw('') }
-                  setPwSaving(false)
-                }} className="w-full bg-gradient-to-r from-purple-700 to-purple-500 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">
-                  {pwSaving ? 'Saving...' : 'Change Password'}
-                </button>
               </div>
             </div>
           </div>
