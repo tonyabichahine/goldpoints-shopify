@@ -10,6 +10,8 @@ interface FlowSummary { id: string; name: string; trigger: string; active: boole
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
   totalPointsLiability: number; campaignRevenue: number; campaignOrders: number
+  activeFlowsCount: number
+  recentCampaigns: { id: string; name: string; recipient_count: number; created_at: string; attributed_revenue: number; attributed_orders: number }[]
   tierBreakdown: { Bronze: number; Silver: number; Gold: number }
   offerPerformance: { id: string; name: string; count: number; pct: number }[]
   pointsChart: { date: string; value: number }[]; signupsChart: { date: string; value: number }[]
@@ -393,11 +395,11 @@ function MerchantDashboardInner() {
                 </div>
 
                 {/* Campaign Revenue Attribution */}
-                {(analytics.campaignRevenue > 0 || analytics.campaignOrders > 0) && (
-                  <div className="bg-[#16162a] border border-emerald-500/20 rounded-xl px-5 py-4 flex items-center justify-between">
+                <div className="bg-[#16162a] border border-emerald-500/20 rounded-xl px-5 py-4">
+                  <div className="flex items-center justify-between">
                     <div>
                       <div className="text-xs text-gray-500 mb-0.5">Campaign-Attributed Revenue (30d)</div>
-                      <div className="text-sm text-gray-400 max-w-xs">Revenue from orders placed within 7 days of a customer receiving a campaign email.</div>
+                      <div className="text-sm text-gray-400 max-w-xs">Revenue from orders placed within the attribution window after receiving a campaign email.</div>
                     </div>
                     <div className="flex items-center gap-6 shrink-0 ml-6">
                       <div className="text-right">
@@ -408,9 +410,39 @@ function MerchantDashboardInner() {
                         <div className="text-xl font-bold text-emerald-300">{analytics.campaignOrders}</div>
                         <div className="text-xs text-gray-600">orders</div>
                       </div>
+                      {analytics.activeFlowsCount > 0 && (
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-purple-400">{analytics.activeFlowsCount}</div>
+                          <div className="text-xs text-gray-600">active flows</div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+
+                  {/* Recent Campaigns */}
+                  {analytics.recentCampaigns.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-white/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Recent Campaigns</div>
+                        <button onClick={() => setTab('campaigns')} className="text-xs text-gray-500 hover:text-white transition">View all →</button>
+                      </div>
+                      <div className="space-y-2.5">
+                        {analytics.recentCampaigns.map(c => (
+                          <div key={c.id} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm text-white truncate">{c.name}</div>
+                              <div className="text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()} · {c.recipient_count.toLocaleString()} recipients</div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-bold text-emerald-400">${c.attributed_revenue.toFixed(2)}</div>
+                              <div className="text-xs text-gray-600">{c.attributed_orders} attributed orders</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Points Liability */}
                 <div className="bg-[#16162a] border border-rose-500/20 rounded-xl px-5 py-4 flex items-center justify-between">
