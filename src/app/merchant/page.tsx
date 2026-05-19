@@ -6,6 +6,9 @@ interface Merchant { id: string; store_name: string; shopify_domain: string; sho
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
+  totalPointsLiability: number
+  tierBreakdown: { Bronze: number; Silver: number; Gold: number }
+  offerPerformance: { id: string; name: string; count: number; pct: number }[]
   pointsChart: { date: string; value: number }[]; signupsChart: { date: string; value: number }[]
   topCustomers: { name: string; email: string; points: number; tier: string }[]
   recentActivity: { points: number; type: string; description: string; created_at: string; customerName: string }[]
@@ -38,6 +41,39 @@ function DonutChart({ segments, total }: { segments: any; total: number }) {
       <div className="absolute inset-[22px] rounded-full bg-[#16162a] flex flex-col items-center justify-center">
         <div className="text-lg font-bold text-white">{total}</div>
         <div className="text-[9px] text-gray-500 leading-tight text-center">members</div>
+      </div>
+    </div>
+  )
+}
+
+const TIER_CONFIG = [
+  { key: 'Bronze', icon: '🥉', color: '#f97316', dim: 'bg-orange-900/30 border-orange-500/20', text: 'text-orange-400' },
+  { key: 'Silver', icon: '🥈', color: '#9ca3af', dim: 'bg-gray-700/30 border-gray-500/20',   text: 'text-gray-300'   },
+  { key: 'Gold',   icon: '🥇', color: '#fbbf24', dim: 'bg-yellow-900/30 border-yellow-500/20', text: 'text-yellow-400' },
+]
+
+function TierBreakdown({ tiers, total }: { tiers: { Bronze: number; Silver: number; Gold: number }; total: number }) {
+  return (
+    <div>
+      <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5 mb-4">
+        {TIER_CONFIG.map(t => {
+          const pct = total > 0 ? (tiers[t.key as keyof typeof tiers] / total * 100) : 0
+          return pct > 0 ? <div key={t.key} style={{ width: `${pct}%`, backgroundColor: t.color }} className="min-w-[4px] transition-all" title={`${t.key}: ${Math.round(pct)}%`} /> : null
+        })}
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {TIER_CONFIG.map(t => {
+          const count = tiers[t.key as keyof typeof tiers] || 0
+          const pct = total > 0 ? Math.round(count / total * 100) : 0
+          return (
+            <div key={t.key} className={`rounded-xl p-4 border ${t.dim}`}>
+              <div className="text-xl mb-2">{t.icon}</div>
+              <div className={`text-2xl font-bold ${t.text}`}>{count}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{t.key}</div>
+              <div className={`text-sm font-semibold mt-1 ${t.text}`}>{pct}%</div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -84,6 +120,7 @@ function MerchantDashboardInner() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
   const [segments, setSegments] = useState<any>(null)
+  const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [aiChat, setAiChat] = useState<{ open: boolean; messages: { role: 'user' | 'ai'; content: string }[]; loading: boolean; input: string }>({ open: false, messages: [], loading: false, input: '' })
   const aiEndRef = useRef<HTMLDivElement>(null)
 
@@ -264,6 +301,18 @@ function MerchantDashboardInner() {
                   ))}
                 </div>
 
+                {/* Points Liability */}
+                <div className="bg-[#16162a] border border-rose-500/20 rounded-xl px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-0.5">Points Liability</div>
+                    <div className="text-sm text-gray-400 max-w-xs">Total unredeemed points outstanding across all your members — your current reward obligation.</div>
+                  </div>
+                  <div className="text-right shrink-0 ml-6">
+                    <div className="text-2xl font-bold text-rose-400">{analytics.totalPointsLiability.toLocaleString()}</div>
+                    <div className="text-xs text-gray-600">pts owed</div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <BarChart title="Points Issued — Last 14 Days" data={analytics.pointsChart} color="#a78bfa" />
                   <BarChart title="New Signups — Last 14 Days" data={analytics.signupsChart} color="#fbbf24" onSeeAll={() => openDrawer('signups')} />
@@ -311,6 +360,34 @@ function MerchantDashboardInner() {
                     </div>
                   </div>
                 </div>
+                {/* Tier Breakdown + Offer Performance */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-[#16162a] border border-white/10 rounded-xl p-5">
+                    <div className="text-sm font-semibold text-gray-300 mb-4">Tier Breakdown</div>
+                    <TierBreakdown tiers={analytics.tierBreakdown} total={analytics.totalCustomers} />
+                  </div>
+                  <div className="bg-[#16162a] border border-white/10 rounded-xl p-5">
+                    <div className="text-sm font-semibold text-gray-300 mb-4">Offer Performance</div>
+                    {analytics.offerPerformance.length === 0 ? (
+                      <p className="text-xs text-gray-600">No redemptions yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {analytics.offerPerformance.map(o => (
+                          <div key={o.id}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm text-white truncate max-w-[70%]">{o.name}</span>
+                              <span className="text-xs text-gray-400 shrink-0 ml-2">{o.count} × · {o.pct}%</span>
+                            </div>
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${o.pct}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Customer Health */}
                 {segments && segments.total > 0 && (
                   <div className="bg-[#16162a] border border-white/10 rounded-xl p-5">
@@ -348,11 +425,23 @@ function MerchantDashboardInner() {
 
         {tab === 'customers' && (
           <div>
-            <h2 className="text-2xl font-bold text-purple-400 mb-6">Customers ({customers.length})</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-purple-400">Customers ({customers.length})</h2>
+              <div className="flex gap-1.5">
+                {(['All', 'Bronze', 'Silver', 'Gold'] as const).map(t => (
+                  <button key={t} onClick={() => setTierFilter(t)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${tierFilter === t
+                      ? t === 'Gold' ? 'bg-yellow-500 text-black' : t === 'Silver' ? 'bg-gray-400 text-black' : t === 'Bronze' ? 'bg-orange-500 text-black' : 'bg-purple-600 text-white'
+                      : 'bg-white/5 text-gray-400 hover:text-white'}`}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
             {customers.length === 0 ? <p className="text-gray-500">No customers yet. They register through your Shopify widget.</p> : (
               <table className="w-full text-sm">
                 <thead className="bg-[#1f1f3a]"><tr>{['Name','Email','Points','Tier','Joined'].map(h => <th key={h} className="px-4 py-3 text-left text-gray-400 font-medium">{h}</th>)}</tr></thead>
-                <tbody>{customers.map((c: any) => (
+                <tbody>{customers.filter((c: any) => tierFilter === 'All' || c.tier === tierFilter).map((c: any) => (
                   <tr key={c.id} className="border-t border-white/5 hover:bg-white/5">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className="px-4 py-3 text-gray-400">{c.email}</td>
