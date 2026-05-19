@@ -38,7 +38,7 @@ async function processEnrollment(enrollment: any) {
   const [flowRes, customerRes, merchantRes] = await Promise.all([
     supabaseAdmin.from('automation_flows').select('nodes, edges').eq('id', enrollment.flow_id).single(),
     supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points').eq('id', enrollment.customer_id).single(),
-    supabaseAdmin.from('merchants').select('store_name, shopify_domain').eq('id', enrollment.merchant_id).single(),
+    supabaseAdmin.from('merchants').select('store_name, shopify_domain, email').eq('id', enrollment.merchant_id).single(),
   ])
 
   if (!flowRes.data || !customerRes.data) {
@@ -51,6 +51,7 @@ async function processEnrollment(enrollment: any) {
   const customer = { ...customerRes.data }
   const storeName = merchantRes.data?.store_name || 'Our Store'
   const shopifyDomain = merchantRes.data?.shopify_domain || ''
+  const merchantEmail = merchantRes.data?.email || ''
 
   const sub = (s: string) => (s || '')
     .replace(/\{\{name\}\}/g, (customer.name || customer.email).split(' ')[0])
@@ -67,7 +68,7 @@ async function processEnrollment(enrollment: any) {
 
     if (node.type === 'email') {
       if (shopifyDomain) {
-        await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain, customer.id, enrollment.merchant_id)
+        await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain, customer.id, enrollment.merchant_id, storeName, merchantEmail)
       } else {
         await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
       }
@@ -169,12 +170,13 @@ async function processPendingCampaignSends() {
   for (const [campaignId, sends] of Object.entries(byCampaign)) {
     const [campaignRes, merchantRes] = await Promise.all([
       supabaseAdmin.from('campaigns').select('subject, body').eq('id', campaignId).single(),
-      supabaseAdmin.from('merchants').select('store_name, shopify_domain').eq('id', sends[0].merchant_id).single(),
+      supabaseAdmin.from('merchants').select('store_name, shopify_domain, email').eq('id', sends[0].merchant_id).single(),
     ])
     if (!campaignRes.data) continue
 
     const storeName = merchantRes.data?.store_name || 'Our Store'
     const shopifyDomain = merchantRes.data?.shopify_domain || ''
+    const merchantEmail = merchantRes.data?.email || ''
     const customerIds = sends.map(s => s.customer_id)
     const { data: customers } = await supabaseAdmin.from('customers')
       .select('id, email, name, points, tier, marketing_consent').in('id', customerIds)
@@ -193,7 +195,7 @@ async function processPendingCampaignSends() {
         const sub = (str: string) => str
           .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
           .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
-        return [buildCampaignEmailPayload(c.email, sub(campaignRes.data!.subject), sub(campaignRes.data!.body), campaignId, c.id, shopifyDomain, sends[0].merchant_id)]
+        return [buildCampaignEmailPayload(c.email, sub(campaignRes.data!.subject), sub(campaignRes.data!.body), campaignId, c.id, shopifyDomain, sends[0].merchant_id, storeName, merchantEmail)]
       })
       if (!emails.length) continue
       try {
