@@ -142,14 +142,28 @@ const WAIT_PRESETS = [
   { label: '1w', amount: 7, unit: 'days' },
 ]
 
-function ConfigPanel({ node, onChange, onClose, onDelete }: {
+function ConfigPanel({ node, onChange, onClose, onDelete, merchantEmail }: {
   node: Node; onChange: (id: string, data: Record<string, unknown>) => void
-  onClose: () => void; onDelete: () => void
+  onClose: () => void; onDelete: () => void; merchantEmail: string
 }) {
   const [d, setD] = useState<Record<string, unknown>>({ ...node.data as Record<string, unknown> })
   const [showPreview, setShowPreview] = useState(false)
-  useEffect(() => { setD({ ...node.data as Record<string, unknown> }); setShowPreview(false) }, [node.id])
+  const [testTo, setTestTo] = useState(merchantEmail)
+  const [testSending, setTestSending] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
+  useEffect(() => { setD({ ...node.data as Record<string, unknown> }); setShowPreview(false); setTestTo(merchantEmail); setTestMsg('') }, [node.id])
   function save() { onChange(node.id, d); onClose() }
+
+  async function sendTestEmail() {
+    setTestSending(true); setTestMsg('')
+    const r = await fetch('/api/merchant/flows/test-email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: d.subject, body: d.body, to: testTo }),
+    })
+    setTestSending(false)
+    if (r.ok) { setTestMsg('✓ Sent!'); setTimeout(() => setTestMsg(''), 3000) }
+    else { setTestMsg('Failed'); setTimeout(() => setTestMsg(''), 3000) }
+  }
 
   return (
     <div className="fixed right-0 top-0 h-full w-80 bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
@@ -203,6 +217,18 @@ function ConfigPanel({ node, onChange, onClose, onDelete }: {
               {showPreview ? '▲ Hide preview' : '▼ Show preview'}
             </button>
             {showPreview && <EmailPreview subject={(d.subject as string) || ''} body={(d.body as string) || ''} />}
+            <div className="border-t border-white/10 pt-3 space-y-2">
+              <label className="block text-xs text-gray-400">Send test email to</label>
+              <input
+                type="email" value={testTo} onChange={e => setTestTo(e.target.value)}
+                placeholder="your@email.com"
+                className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+              />
+              <button onClick={sendTestEmail} disabled={testSending || !testTo}
+                className="w-full border border-purple-500/40 hover:border-purple-500 bg-purple-900/20 hover:bg-purple-900/30 text-purple-300 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-40">
+                {testSending ? 'Sending…' : testMsg || '✉ Send Test Email'}
+              </button>
+            </div>
           </>
         )}
 
@@ -378,6 +404,7 @@ function FlowBuilder() {
   }, [])
 
   const [flowName, setFlowName] = useState('Untitled Flow')
+  const [merchantEmail, setMerchantEmail] = useState('')
   const [active, setActive] = useState(false)
   const [allowReenroll, setAllowReenroll] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -391,7 +418,7 @@ function FlowBuilder() {
   const [rfInstance, setRfInstance] = useState<any>(null)
 
   useEffect(() => {
-    fetch('/api/merchant/me').then(r => { if (r.status === 401) router.push('/') })
+    fetch('/api/merchant/me').then(r => { if (r.status === 401) router.push('/'); return r.ok ? r.json() : null }).then(d => { if (d?.email) setMerchantEmail(d.email) })
     if (flowId !== 'new') {
       fetch(`/api/merchant/flows?id=${flowId}`)
         .then(r => r.ok ? r.json() : null)
@@ -591,6 +618,7 @@ function FlowBuilder() {
             onChange={(id, data) => { updateNodeData(id, data); setSelectedNode(n => n ? { ...n, data: { ...n.data, ...data } } : null) }}
             onClose={() => setSelectedNode(null)}
             onDelete={() => deleteNode(selectedNode.id)}
+            merchantEmail={merchantEmail}
           />
         )}
         {showAnalytics && flowId !== 'new' && (
