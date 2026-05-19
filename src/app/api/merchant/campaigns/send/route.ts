@@ -6,8 +6,8 @@ function getMerchantId(req: NextRequest) {
   return req.cookies.get('merchant_session')?.value || null
 }
 
-async function getSegmentCustomers(merchantId: string, segment: string): Promise<{ email: string; name: string; points: number; tier: string }[]> {
-  const base = () => supabaseAdmin.from('customers').select('email, name, points, tier').eq('merchant_id', merchantId)
+async function getSegmentCustomers(merchantId: string, segment: string): Promise<{ id: string; email: string; name: string; points: number; tier: string }[]> {
+  const base = () => supabaseAdmin.from('customers').select('id, email, name, points, tier').eq('merchant_id', merchantId)
 
   if (segment === 'all') {
     const { data } = await base()
@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
   const { data: campaign } = await supabaseAdmin.from('campaigns')
     .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length })
     .select().single()
+
+  if (campaign?.id && customers.length > 0) {
+    await supabaseAdmin.from('campaign_sends').insert(
+      customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id }))
+    )
+  }
 
   return NextResponse.json({ ok: true, sent: customers.length, campaign })
 }

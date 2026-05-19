@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     { data: newCustomers },
     { data: allCustomers },
     { data: allRedemptions },
+    { data: campaignAttribs },
   ] = await Promise.all([
     supabaseAdmin.from('customers').select('*', { count: 'exact', head: true }).eq('merchant_id', merchantId),
     supabaseAdmin.from('point_transactions').select('points, type, created_at').eq('merchant_id', merchantId).gte('created_at', since30),
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from('customers').select('created_at').eq('merchant_id', merchantId).gte('created_at', since14),
     supabaseAdmin.from('customers').select('points, tier').eq('merchant_id', merchantId),
     supabaseAdmin.from('redemptions').select('offer_id, offers(name)').eq('merchant_id', merchantId),
+    supabaseAdmin.from('campaign_attributions').select('revenue').eq('merchant_id', merchantId).gte('created_at', since30),
   ])
 
   const totalPointsIssued = (txAll || []).filter(t => t.points > 0).reduce((s, t) => s + t.points, 0)
@@ -74,12 +76,17 @@ export async function GET(req: NextRequest) {
   const pointsChart = Object.entries(pointsByDay).map(([date, value]) => ({ date: date.slice(5), value }))
   const signupsChart = Object.entries(signupsByDay).map(([date, value]) => ({ date: date.slice(5), value }))
 
+  const campaignRevenue = (campaignAttribs || []).reduce((s, a) => s + (parseFloat(a.revenue) || 0), 0)
+  const campaignOrders = (campaignAttribs || []).length
+
   return NextResponse.json({
     totalCustomers: totalCustomers || 0,
     totalPointsIssued,
     totalPointsRedeemed,
     totalRedemptions: totalRedemptions || 0,
     totalPointsLiability,
+    campaignRevenue,
+    campaignOrders,
     tierBreakdown,
     offerPerformance,
     pointsChart,

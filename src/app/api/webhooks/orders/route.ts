@@ -79,6 +79,28 @@ export async function POST(req: NextRequest) {
     tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(() => {})
   }
 
+  // Campaign attribution: if customer received a campaign email in the last 7 days, attribute this order
+  const attributionWindow = new Date(Date.now() - 7 * 86400000).toISOString()
+  ;(async () => {
+    try {
+      const { data: send } = await supabaseAdmin.from('campaign_sends')
+        .select('campaign_id')
+        .eq('customer_id', customer.id)
+        .gte('sent_at', attributionWindow)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (!send) return
+      await supabaseAdmin.from('campaign_attributions').insert({
+        campaign_id: send.campaign_id,
+        merchant_id: merchant.id,
+        customer_id: customer.id,
+        shopify_order_id: String(order.id),
+        revenue: orderTotal,
+      })
+    } catch {}
+  })()
+
   if (newTier !== customer.tier) {
     const trigger = newTier === 'Gold' ? 'tier_gold' : newTier === 'Silver' ? 'tier_silver' : null
     if (trigger) {
