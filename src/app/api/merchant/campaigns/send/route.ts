@@ -11,7 +11,7 @@ function getMerchantId(req: NextRequest) {
 }
 
 async function getSegmentCustomers(merchantId: string, segment: string): Promise<{ id: string; email: string; name: string; points: number; tier: string }[]> {
-  const base = () => supabaseAdmin.from('customers').select('id, email, name, points, tier').eq('merchant_id', merchantId)
+  const base = () => supabaseAdmin.from('customers').select('id, email, name, points, tier, marketing_consent').eq('merchant_id', merchantId)
 
   if (segment === 'all') {
     const { data } = await base()
@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
   const storeName = merchant?.store_name || 'Our Store'
   const shopifyDomain = merchant?.shopify_domain || ''
 
-  const customers = await getSegmentCustomers(merchantId, segment || 'all')
+  const allCustomers = await getSegmentCustomers(merchantId, segment || 'all')
+  const customers = allCustomers.filter((c: any) => c.marketing_consent !== false)
   if (customers.length === 0) return NextResponse.json({ error: 'No customers in this segment' }, { status: 400 })
 
   // Save campaign first so we have an ID for tracked links
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     const sub = (s: string) => s
       .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
       .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
-    return { customerId: c.id, email: buildCampaignEmailPayload(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain) }
+    return { customerId: c.id, email: buildCampaignEmailPayload(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain, merchantId) }
   })
 
   // Send in batches of 100 via Resend batch API

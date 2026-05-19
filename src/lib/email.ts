@@ -60,13 +60,14 @@ function wrapEmail(body: string) {
 
 export function buildCampaignEmailPayload(
   to: string, subject: string, body: string,
-  campaignId: string, customerId: string, shopifyDomain: string,
+  campaignId: string, customerId: string, shopifyDomain: string, merchantId: string,
 ): { from: string; to: string; subject: string; html: string } {
   const recipient = process.env.TEST_EMAIL || to
   const storeUrl = shopifyDomain ? `https://${shopifyDomain}` : ''
   const trackedBtn = storeUrl
     ? `<div style="text-align:center;margin-top:24px"><a href="${BASE_URL}/api/track/click?cid=${campaignId}&uid=${customerId}&url=${encodeURIComponent(storeUrl)}" style="display:inline-block;background:#6c3fff;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem">Shop Now →</a></div>`
     : ''
+  const unsubLink = `${BASE_URL}/api/unsub?uid=${customerId}&mid=${merchantId}`
   const escaped = body
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -81,7 +82,7 @@ export function buildCampaignEmailPayload(
   <body><div class="wrap">
     <div class="hdr"><h1>⭐ GoldPoints</h1></div>
     <div class="bdy">${escaped}${trackedBtn}</div>
-    <div class="ftr">You're receiving this as a loyalty member of this store.</div>
+    <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a></div>
   </div></body></html>`
   return { from: FROM_EMAIL, to: recipient, subject, html }
 }
@@ -118,13 +119,14 @@ export async function sendCampaignEmailHtml(
 
 export async function sendFlowEmail(
   to: string, subject: string, body: string,
-  enrollmentId: string, shopifyDomain: string,
+  enrollmentId: string, shopifyDomain: string, customerId: string, merchantId: string,
 ) {
   const recipient = process.env.TEST_EMAIL || to
   const storeUrl = shopifyDomain ? `https://${shopifyDomain}` : ''
   const trackedBtn = storeUrl
     ? `<div style="text-align:center;margin-top:24px"><a href="${BASE_URL}/api/track/click?eid=${enrollmentId}&url=${encodeURIComponent(storeUrl)}" style="display:inline-block;background:#6c3fff;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem">Shop Now →</a></div>`
     : ''
+  const unsubLink = `${BASE_URL}/api/unsub?uid=${customerId}&mid=${merchantId}`
   const escaped = body
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -139,7 +141,7 @@ export async function sendFlowEmail(
   <body><div class="wrap">
     <div class="hdr"><h1>⭐ GoldPoints</h1></div>
     <div class="bdy">${escaped}${trackedBtn}</div>
-    <div class="ftr">You're receiving this as a loyalty member of this store.</div>
+    <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a></div>
   </div></body></html>`
   try {
     await resend.emails.send({ from: FROM_EMAIL, to: recipient, subject, html })

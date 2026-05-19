@@ -67,7 +67,7 @@ async function processEnrollment(enrollment: any) {
 
     if (node.type === 'email') {
       if (shopifyDomain) {
-        await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain)
+        await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain, customer.id, enrollment.merchant_id)
       } else {
         await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
       }
@@ -177,10 +177,12 @@ async function processPendingCampaignSends() {
     const shopifyDomain = merchantRes.data?.shopify_domain || ''
     const customerIds = sends.map(s => s.customer_id)
     const { data: customers } = await supabaseAdmin.from('customers')
-      .select('id, email, name, points, tier').in('id', customerIds)
+      .select('id, email, name, points, tier, marketing_consent').in('id', customerIds)
     if (!customers?.length) continue
 
-    const customerMap = Object.fromEntries(customers.map(c => [c.id, c]))
+    const customerMap = Object.fromEntries(
+      (customers.filter((c: any) => c.marketing_consent !== false)).map(c => [c.id, c])
+    )
 
     for (let i = 0; i < sends.length; i += BATCH_SIZE) {
       const batch = sends.slice(i, i + BATCH_SIZE)
@@ -191,7 +193,7 @@ async function processPendingCampaignSends() {
         const sub = (str: string) => str
           .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
           .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
-        return [buildCampaignEmailPayload(c.email, sub(campaignRes.data!.subject), sub(campaignRes.data!.body), campaignId, c.id, shopifyDomain)]
+        return [buildCampaignEmailPayload(c.email, sub(campaignRes.data!.subject), sub(campaignRes.data!.body), campaignId, c.id, shopifyDomain, sends[0].merchant_id)]
       })
       if (!emails.length) continue
       try {
