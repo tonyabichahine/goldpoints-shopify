@@ -84,8 +84,14 @@ On Vercel all of these are set as Environment Variables. `TEST_EMAIL` is tempora
 src/
 ├── app/
 │   ├── page.tsx                              # Home — "I'm a Merchant" + "I'm a Customer"
+│   ├── reset-password/page.tsx              # Customer password reset page (via email link)
+│   ├── reset-merchant-password/page.tsx     # Merchant password reset page (via email link)
 │   ├── admin/page.tsx                        # Admin dashboard — only at /admin directly (not linked)
-│   ├── merchant/page.tsx                     # Merchant dashboard — 4 tabs: Overview, Customers, Offers, Settings
+│   ├── merchant/
+│   │   ├── page.tsx                          # Merchant dashboard — tabs: Overview, Customers, Campaigns, Offers, Settings
+│   │   └── flows/[id]/
+│   │       ├── page.tsx                      # Thin wrapper with next/dynamic ssr:false
+│   │       └── FlowBuilderClient.tsx         # Visual automation flow builder (@xyflow/react)
 │   ├── portal/[domain]/page.tsx             # Customer portal per merchant
 │   ├── ref/[code]/page.tsx                  # Referral redirect → store with ?gp_ref=
 │   ├── api/
@@ -94,11 +100,15 @@ src/
 │   │   │   └── callback/route.ts             # OAuth callback — links to existing merchant
 │   │   ├── webhooks/
 │   │   │   └── orders/
-│   │   │       ├── route.ts                  # Order created → award points (HMAC verified)
+│   │   │       ├── route.ts                  # Order created → award points + campaign attribution (HMAC verified)
 │   │   │       └── cancelled/route.ts        # Order cancelled → deduct points (HMAC verified)
+│   │   ├── cron/
+│   │   │   └── automations/route.ts          # Hourly cron (daily on Hobby) — processes automation_enrollments
 │   │   ├── widget/                           # CORS-enabled (called from any Shopify storefront)
 │   │   │   ├── config/route.ts               # Widget settings + active offers for a shop
 │   │   │   ├── register/route.ts             # Legacy customer registration
+│   │   │   ├── login/route.ts                # Customer widget login (email+password)
+│   │   │   ├── forgot-password/route.ts      # Customer forgot password → sends reset email
 │   │   │   ├── points/route.ts               # Customer points/tier/referral_code lookup
 │   │   │   ├── profile/route.ts              # Create/update customer profile; handles gp_ref referral
 │   │   │   ├── follow/route.ts               # Award social follow points once per customer
@@ -117,35 +127,52 @@ src/
 │   │       ├── login/route.ts                # Merchant login → sets merchant_session cookie
 │   │       ├── me/route.ts                   # GET: merchant data | DELETE: logout
 │   │       ├── change-password/route.ts      # Verifies current password, sets new bcrypt hash
+│   │       ├── forgot-password/route.ts      # Merchant forgot password → sends reset email
+│   │       ├── reset-password/route.ts       # Merchant password reset (token validation)
 │   │       ├── customers/route.ts            # Lists customers
 │   │       ├── offers/route.ts               # CRUD offers
 │   │       ├── settings/route.ts             # Saves all widget/points/tier settings
+│   │       ├── campaigns/
+│   │       │   ├── route.ts                  # List campaigns (with attribution stats)
+│   │       │   └── send/route.ts             # Send campaign to segment, save to campaign_sends
+│   │       ├── automations/route.ts          # CRUD legacy automations (trigger-based single email)
+│   │       ├── flows/route.ts                # CRUD visual automation flows (GET/POST/PATCH/DELETE)
 │   │       ├── analytics/
-│   │       │   ├── route.ts                  # Main analytics: KPIs, 14d charts, top customers, recent activity
+│   │       │   ├── route.ts                  # Main analytics: KPIs, 14d charts, top customers, campaign revenue
 │   │       │   ├── detail/route.ts           # Drill-down: points/redemptions/signups/activity/segment
 │   │       │   └── segments/route.ts         # Customer lifecycle segment counts for donut chart
 │   │       └── ai-insights/route.ts          # AI chat — Groq LLaMA 3.3 70B, context-aware
 ├── lib/
 │   ├── supabase.ts                           # supabase (anon) + supabaseAdmin (service role)
-│   └── shopify.ts                            # OAuth helpers, getTier(points, silverThreshold, goldThreshold)
+│   ├── shopify.ts                            # OAuth helpers, getTier(), tagShopifyCustomer(), buildUpgradeBonusData()
+│   └── email.ts                              # fireAutomation() single-email trigger, enrollInFlows() visual flow enrollment
 public/
 ├── widget.js                                 # Embeddable IIFE widget — no dependencies
 └── logo.png                                  # GoldPoints logo
+vercel.json                                   # Cron: /api/cron/automations daily at midnight UTC (Hobby plan = daily only)
 ```
 
 ## Database (Supabase) — all tables are live
 | Table | Key columns |
 |---|---|
-| `merchants` | id, shopify_domain (nullable), store_name, email, password_hash, active, points_per_dollar, signup_bonus, birthday_bonus, widget_primary_color, widget_btn_text_color, widget_title, widget_position, widget_offset_bottom, widget_offset_side, social_follow_url, follow_points, referral_points, **tier_silver**, **tier_gold**, shopify_access_token |
-| `customers` | id, merchant_id, email, name, phone, birthday, marketing_consent, password_hash, points, tier, referral_code, referred_by |
-| `offers` | id, merchant_id, name, description, points_required, offer_type, offer_value, active |
+| `merchants` | id, shopify_domain, store_name, email, password_hash, active, points_per_dollar, signup_bonus, birthday_bonus, widget_primary_color, widget_btn_text_color, widget_title, widget_position, widget_offset_bottom, widget_offset_side, social_follow_url, follow_points, referral_points, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, shopify_access_token |
+| `customers` | id, merchant_id, email, name, phone, birthday, marketing_consent, password_hash, points, tier, lifetime_points, referral_code, referred_by, shopify_customer_id, silver_bonus_awarded, gold_bonus_awarded |
+| `offers` | id, merchant_id, name, description, points_required, offer_type, offer_value, active, min_tier |
 | `point_transactions` | id, merchant_id, customer_id, type, points, description, shopify_order_id, created_at |
 | `redemptions` | id, merchant_id, customer_id, offer_id, discount_code, created_at |
+| `campaigns` | id, merchant_id, name, subject, body, segment, sent_at, recipient_count |
+| `campaign_sends` | id, campaign_id, merchant_id, customer_id, sent_at |
+| `campaign_attributions` | id, campaign_id, merchant_id, customer_id, shopify_order_id (UNIQUE), revenue, created_at |
+| `automations` | id, merchant_id, name, trigger, subject, body, active |
+| `automation_flows` | id, merchant_id, name, trigger, active, nodes (jsonb), edges (jsonb) |
+| `automation_enrollments` | id, flow_id, customer_id, merchant_id, status, current_node_id, next_run_at |
 
 **point_transactions.type values:**
-`earn_order`, `earn_signup`, `earn_referral`, `earn_follow`, `earn_birthday`, `redeem`, `deduct_cancel`
+`earn_order`, `earn_signup`, `earn_referral`, `earn_follow`, `earn_birthday`, `redeem`, `deduct_cancel`, `earn_upgrade_silver`, `earn_upgrade_gold`
 
 `deduct_cancel` is inserted when a Shopify order is cancelled — it stores the same `shopify_order_id` as the original `earn_order`. The segmentation logic excludes earn transactions whose `shopify_order_id` appears in any `deduct_cancel` row when computing "last purchase date".
+
+**Campaign attribution:** When an order webhook fires, it checks `campaign_sends` for the customer within 7 days and inserts into `campaign_attributions` (UNIQUE on shopify_order_id — no double-counting).
 
 ## Tiers
 | Tier | Default min points | Icon |
@@ -157,13 +184,16 @@ public/
 Thresholds are set per merchant via `tier_silver` and `tier_gold` columns. `getTier(points, silverThreshold, goldThreshold)` in `src/lib/shopify.ts` defaults to 500/1000 if not set. All three call sites (earn webhook, cancel webhook, redeem) pass merchant thresholds.
 
 ## Merchant dashboard tabs
-1. **Overview** — KPI cards (members, points issued 30d, points redeemed 30d, redemptions 30d), Points Liability card, 14-day bar charts (points issued + signups), Top Customers, Recent Activity, Tier Breakdown, Offer Performance bars, Customer Health donut chart
+1. **Overview** — KPI cards (members, points issued 30d, points redeemed 30d, redemptions 30d, campaign revenue), Points Liability card, 14-day bar charts (points issued + signups), Top Customers, Recent Activity, Tier Breakdown, Offer Performance bars, Customer Health donut chart
 2. **Customers** — full customer table with tier filter (All / Bronze / Silver / Gold)
-3. **Offers** — CRUD for loyalty offers
-4. **Settings** — three sections in one tab:
-   - *Widget* — all program settings (color, position, points/dollar, bonuses, tier thresholds, referral, social follow) + Save button
+3. **Campaigns** — two sub-sections:
+   - *Email Campaigns* — compose subject + body, pick segment (All/tier/lifecycle), send, view history with attribution stats (orders + revenue attributed)
+   - *Automations* — list visual automation flows; "New Flow" → enters name → redirects to `/merchant/flows/[id]` visual builder
+4. **Offers** — CRUD for loyalty offers (with min_tier locking)
+5. **Settings** — three sections in one tab:
+   - *Widget* — all program settings (color, position, points/dollar, bonuses, tier thresholds, multipliers, referral, social follow) + Save button
    - *Install* — Liquid snippet + webhook setup instructions
-   - *Account* — logged-in email + Change Password
+   - *Account* — logged-in email + Change Password + Forgot Password
 
 ## Analytics drill-down drawers
 Clicking KPI cards or "See all" opens a slide-in drawer. `type` param options:
@@ -226,28 +256,44 @@ API: `GET /api/merchant/analytics/segments` — returns counts + percentages for
 - Merchant email+password login (Tony-controlled onboarding)
 - Welcome email via Resend on merchant creation (routed to TEST_EMAIL during dev)
 - Merchant connects Shopify via OAuth from inside dashboard
-- Full widget: pill launcher, welcome carousel, profile completion, Home/Rewards/Offers/Profile tabs
+- Full widget: pill launcher, welcome carousel, register/login/forgot-password, Home/Rewards/Offers/Profile tabs
 - Referral system: unique codes, /ref/[code] redirect, localStorage persistence through auth
 - Social follow: honor-system one-time points
 - Order points via webhook (HMAC verified) + cancellation deduction webhook
+- Tier multipliers (Bronze/Silver/Gold) + upgrade bonuses (one-time point bonus on tier change)
+- Shopify customer tags (gp-bronze/silver/gold) auto-applied on tier change
+- Lifetime points tracking — separate from spendable points
 - Customer portal: email+password login, points, history, redeem
 - Admin: create merchants, stats, manage
 - **Analytics dashboard:** KPI cards, 14-day bar charts, top customers, recent activity, drill-down drawers with period filters
 - **Points Liability card**, **Offer Performance** mini-bars, **Tier Breakdown** stacked visual
 - **Customer Health** donut chart with 6 lifecycle segments (cancelled orders excluded from last purchase)
 - **AI assistant** in nav bar — context-aware chat powered by Groq LLaMA 3.3 70B
-- **Merchant-configurable tier thresholds** — Silver/Gold point minimums set per store in Settings
-- Customers tab tier filter (All / Bronze / Silver / Gold)
-- Settings tab consolidates Widget, Install, and Account in one place
+- **Merchant-configurable tier thresholds** — Silver/Gold point minimums + multipliers set per store
+- **Email campaigns** — compose, pick segment, send, history with attribution stats
+- **Campaign revenue attribution** — 7-day window, tracks orders from campaign email clicks
+- **Visual automation flow builder** — ManyChat-style drag-and-drop at /merchant/flows/[id]
+- **Automation cron engine** — processes enrollments daily at midnight UTC
+- **Forgot password** — customer (widget) + merchant (dashboard) both have reset email flow
 - GoldPoints logo as favicon and in welcome emails
 
 ## What is NOT yet built
-1. **Email domain** — verify a domain on Resend to send to real merchant emails (remove TEST_EMAIL after)
-2. **Birthday bonus logic** — column exists, no cron/trigger yet
-3. **Customer tags in Shopify** — tag customers by tier (gp-gold etc.) — needs `write_customers` scope (already in app)
-4. **Email/WhatsApp campaigns** — merchants send campaigns to customer segments
-5. **Subscription/billing** — Stripe for merchant payments
-6. **Forgot password** — customer + merchant password reset via email
+1. **Email domain** — verify a domain on Resend to send to real merchant emails (remove TEST_EMAIL after) — CRITICAL before real merchants
+2. **Birthday bonus cron** — `birthday_bonus` column + `earn_birthday` type exist; cron stub exists but no actual birthday query yet
+3. **Subscription/billing** — Stripe for merchant payments (needed before charging merchants)
+4. **Automation flows battle-tested** — cron runs daily only (Hobby plan); flow execution logic is new and untested at scale
+5. **Campaign scheduling** — currently campaigns send immediately; no scheduled/future send
+
+## Vercel deployment notes
+- **Hobby plan:** cron limited to DAILY (`0 0 * * *`). Hourly `0 * * * *` silently blocks ALL deployments — do not use.
+- **GitHub webhook unreliable:** If pushes don't auto-deploy, trigger via Vercel API:
+  ```bash
+  curl -X POST "https://api.vercel.com/v13/deployments?teamId=team_x9DuedDZLuc0YGF67agFCLQX&forceNew=1" \
+    -H "Authorization: Bearer <VERCEL_TOKEN>" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"goldpoints-shopify","gitSource":{"type":"github","repo":"goldpoints-shopify","repoId":1240124706,"ref":"master","sha":"<COMMIT_SHA>"}}'
+  ```
+- Vercel token + project ID are in Claude memory (never commit them)
 
 ## Owner context
 Tony is a non-developer building this as a SaaS product. Keep explanations clear, implement directly without long preambles. Use `py -m pip` (not `pip`) if Python is ever needed. Never push to GitHub without Tony's explicit instruction.
