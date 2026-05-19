@@ -5,7 +5,11 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://goldpoints-shopify.vercel.app'
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'GoldPoints <onboarding@resend.dev>'
 
-function buildFrom(storeName?: string): string {
+function buildFrom(storeName?: string, customFromEmail?: string): string {
+  if (customFromEmail) {
+    const name = storeName ? `${storeName} Rewards` : 'Rewards'
+    return `${name} <${customFromEmail}>`
+  }
   if (!storeName) return FROM_EMAIL
   const match = FROM_EMAIL.match(/<(.+)>/)
   const emailAddr = match ? match[1] : FROM_EMAIL
@@ -68,7 +72,7 @@ function wrapEmail(body: string) {
 export function buildCampaignEmailPayload(
   to: string, subject: string, body: string,
   campaignId: string, customerId: string, shopifyDomain: string, merchantId: string,
-  storeName?: string, replyTo?: string,
+  storeName?: string, replyTo?: string, customFromEmail?: string,
 ): { from: string; to: string; replyTo?: string; subject: string; html: string } {
   const recipient = process.env.TEST_EMAIL || to
   const storeUrl = shopifyDomain ? `https://${shopifyDomain}` : ''
@@ -92,7 +96,7 @@ export function buildCampaignEmailPayload(
     <div class="bdy">${escaped}${trackedBtn}</div>
     <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a></div>
   </div></body></html>`
-  const payload: { from: string; to: string; replyTo?: string; subject: string; html: string } = { from: buildFrom(storeName), to: recipient, subject, html }
+  const payload: { from: string; to: string; replyTo?: string; subject: string; html: string } = { from: buildFrom(storeName, customFromEmail), to: recipient, subject, html }
   if (replyTo) payload.replyTo = replyTo
   return payload
 }
@@ -130,7 +134,7 @@ export async function sendCampaignEmailHtml(
 export async function sendFlowEmail(
   to: string, subject: string, body: string,
   enrollmentId: string, shopifyDomain: string, customerId: string, merchantId: string,
-  storeName?: string, replyTo?: string,
+  storeName?: string, replyTo?: string, customFromEmail?: string,
 ) {
   const recipient = process.env.TEST_EMAIL || to
   const storeUrl = shopifyDomain ? `https://${shopifyDomain}` : ''
@@ -155,7 +159,7 @@ export async function sendFlowEmail(
     <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a></div>
   </div></body></html>`
   try {
-    const payload: Parameters<typeof resend.emails.send>[0] = { from: buildFrom(storeName), to: recipient, subject, html }
+    const payload: Parameters<typeof resend.emails.send>[0] = { from: buildFrom(storeName, customFromEmail), to: recipient, subject, html }
     if (replyTo) payload.replyTo = replyTo
     await resend.emails.send(payload)
   } catch {}

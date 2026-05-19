@@ -54,10 +54,11 @@ export async function POST(req: NextRequest) {
   const { name, subject, emailBody, segment } = await req.json()
   if (!name || !subject || !emailBody) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
-  const { data: merchant } = await supabaseAdmin.from('merchants').select('store_name, shopify_domain, email').eq('id', merchantId).single()
+  const { data: merchant } = await supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email').eq('id', merchantId).single()
   const storeName = merchant?.store_name || 'Our Store'
   const shopifyDomain = merchant?.shopify_domain || ''
   const merchantEmail = merchant?.email || ''
+  const customFromEmail = merchant?.is_premium && merchant?.custom_from_email ? merchant.custom_from_email : undefined
 
   const allCustomers = await getSegmentCustomers(merchantId, segment || 'all')
   const customers = allCustomers.filter((c: any) => c.marketing_consent !== false)
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
     const sub = (s: string) => s
       .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
       .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
-    return { customerId: c.id, email: buildCampaignEmailPayload(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain, merchantId, storeName, merchantEmail) }
+    return { customerId: c.id, email: buildCampaignEmailPayload(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain, merchantId, storeName, merchantEmail, customFromEmail) }
   })
 
   // Send in batches of 100 via Resend batch API

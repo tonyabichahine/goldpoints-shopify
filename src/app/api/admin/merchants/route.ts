@@ -7,8 +7,13 @@ function isAdmin(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id, active } = await req.json()
-  await supabaseAdmin.from('merchants').update({ active }).eq('id', id)
+  const body = await req.json()
+  const { id, active, is_premium, custom_from_email } = body
+  const update: Record<string, any> = {}
+  if (active !== undefined) update.active = active
+  if (is_premium !== undefined) update.is_premium = is_premium
+  if (custom_from_email !== undefined) update.custom_from_email = custom_from_email
+  await supabaseAdmin.from('merchants').update(update).eq('id', id)
   return NextResponse.json({ ok: true })
 }
 
