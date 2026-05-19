@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
-interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number }
+interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number; error_enrollments: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
   totalPointsLiability: number; campaignRevenue: number; campaignOrders: number
@@ -581,6 +581,7 @@ function MerchantDashboardInner() {
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">👥 {f.enrolled} enrolled</span>
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">⚡ {f.active_enrollments} active</span>
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">✓ {completionRate}% done</span>
+                                {f.error_enrollments > 0 && <span className="text-xs bg-red-900/40 text-red-400 px-2 py-1 rounded-full">⚠ {f.error_enrollments} errors</span>}
                               </div>
                             </button>
                           )
@@ -790,6 +791,14 @@ function MerchantDashboardInner() {
                       <div className="min-w-0">
                         <div className="font-semibold text-sm text-white truncate">{f.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{triggerLabel[f.trigger] || f.trigger} · {new Date(f.created_at).toLocaleDateString()}</div>
+                        {f.enrolled > 0 && (
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className="text-xs text-gray-500">👥 {f.enrolled}</span>
+                            <span className="text-xs text-yellow-500">⚡ {f.active_enrollments}</span>
+                            <span className="text-xs text-green-500">✓ {f.completed_enrollments}</span>
+                            {f.error_enrollments > 0 && <span className="text-xs text-red-400">⚠ {f.error_enrollments} errors</span>}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1069,6 +1078,14 @@ function MerchantDashboardInner() {
                     </div>
                   ))}
                 </div>
+                {f.error_enrollments > 0 && (
+                  <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-red-400">⚠ {f.error_enrollments} enrollment{f.error_enrollments !== 1 ? 's' : ''} stalled</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Failed 3 times — reset from Admin panel to retry</div>
+                    </div>
+                  </div>
+                )}
                 <button onClick={() => { setFlowDetail(null); router.push(`/merchant/flows/${f.id}`) }}
                   className="w-full text-center text-xs text-gray-500 hover:text-white transition py-2 border border-white/10 hover:border-white/25 rounded-lg">
                   Open in Flow Builder →

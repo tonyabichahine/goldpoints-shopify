@@ -6,6 +6,8 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 const BATCH_SIZE = 100
 const MAX_ERRORS = 3
+const ENROLLMENT_LIMIT = 500
+const ENROLLMENT_CONCURRENCY = 20
 
 export const dynamic = 'force-dynamic'
 
@@ -71,6 +73,11 @@ async function processEnrollment(enrollment: any) {
       if (node.type === 'end') { await supabaseAdmin.from('automation_enrollments').update({ status: 'completed', error_count: 0 }).eq('id', enrollment.id); return }
 
       if (node.type === 'email') {
+        currentNodeId = getNextNodeId(node.id, edges)
+        // Advance DB position before sending — crash after this misses the send rather than duplicating it
+        await supabaseAdmin.from('automation_enrollments')
+          .update({ current_node_id: currentNodeId, error_count: 0 })
+          .eq('id', enrollment.id)
         if (customer.marketing_consent !== false) {
           if (shopifyDomain) {
             await sendFlowEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''), enrollment.id, shopifyDomain, customer.id, enrollment.merchant_id, storeName, merchantEmail, customFromEmail)
@@ -82,7 +89,6 @@ async function processEnrollment(enrollment: any) {
             .eq('id', enrollment.id)
           enrollment.last_email_sent_at = new Date().toISOString()
         }
-        currentNodeId = getNextNodeId(node.id, edges)
       } else if (node.type === 'wait') {
         const ms = (node.data.unit === 'hours' ? 3600000 : 86400000) * (node.data.amount || 1)
         currentNodeId = getNextNodeId(node.id, edges)
@@ -308,14 +314,15 @@ export async function GET(req: NextRequest) {
     .select('id, flow_id, customer_id, merchant_id, current_node_id, last_email_click_at, last_email_sent_at, error_count')
     .eq('status', 'active')
     .lte('next_run_at', new Date().toISOString())
-    .limit(100)
+    .limit(ENROLLMENT_LIMIT)
 
   if (!enrollments?.length) return NextResponse.json({ processed: 0 })
 
   let processed = 0
-  for (const e of enrollments) {
-    await processEnrollment(e)
-    processed++
+  for (let i = 0; i < enrollments.length; i += ENROLLMENT_CONCURRENCY) {
+    const chunk = enrollments.slice(i, i + ENROLLMENT_CONCURRENCY)
+    await Promise.allSettled(chunk.map(e => processEnrollment(e)))
+    processed += chunk.length
   }
 
   return NextResponse.json({ processed })

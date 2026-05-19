@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
       const total = enrollments?.length || 0
       const active = enrollments?.filter(e => e.status === 'active').length || 0
       const completed = enrollments?.filter(e => e.status === 'completed').length || 0
-      return NextResponse.json({ ...data, analytics: { total, active, completed } })
+      const error = enrollments?.filter(e => e.status === 'error').length || 0
+      return NextResponse.json({ ...data, analytics: { total, active, completed, error } })
     }
     return NextResponse.json(data)
   }
@@ -35,12 +36,13 @@ export async function GET(req: NextRequest) {
     .select('flow_id, status')
     .in('flow_id', flowList.map(f => f.id))
 
-  const enrollMap: Record<string, { total: number; active: number; completed: number }> = {}
+  const enrollMap: Record<string, { total: number; active: number; completed: number; error: number }> = {}
   for (const e of enrollments || []) {
-    if (!enrollMap[e.flow_id]) enrollMap[e.flow_id] = { total: 0, active: 0, completed: 0 }
+    if (!enrollMap[e.flow_id]) enrollMap[e.flow_id] = { total: 0, active: 0, completed: 0, error: 0 }
     enrollMap[e.flow_id].total++
     if (e.status === 'active') enrollMap[e.flow_id].active++
     if (e.status === 'completed') enrollMap[e.flow_id].completed++
+    if (e.status === 'error') enrollMap[e.flow_id].error++
   }
 
   return NextResponse.json(flowList.map(f => ({
@@ -48,6 +50,7 @@ export async function GET(req: NextRequest) {
     enrolled: enrollMap[f.id]?.total || 0,
     active_enrollments: enrollMap[f.id]?.active || 0,
     completed_enrollments: enrollMap[f.id]?.completed || 0,
+    error_enrollments: enrollMap[f.id]?.error || 0,
   })))
 }
 
