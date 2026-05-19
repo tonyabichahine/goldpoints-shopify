@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendEmail, sendFlowEmail } from '@/lib/email'
+import { sendEmail, sendFlowEmail, buildCampaignEmailPayload } from '@/lib/email'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+const BATCH_SIZE = 100
 
 export const dynamic = 'force-dynamic'
 
@@ -129,7 +133,7 @@ async function enrollBirthdayCustomers() {
   if (!flows?.length) return
 
   for (const flow of flows) {
-    const { data: birthdayData } = await supabaseAdmin.rpc('get_birthday_customers', { p_merchant_id: flow.merchant_id }).select('id')
+    const { data: birthdayData } = await supabaseAdmin.rpc('get_birthday_customers', { p_merchant_id: flow.merchant_id })
     const customers = (Array.isArray(birthdayData) ? birthdayData : birthdayData ? [birthdayData] : []) as { id: string }[]
     const nodes: any[] = flow.nodes || []
     const edges: any[] = flow.edges || []
@@ -141,6 +145,60 @@ async function enrollBirthdayCustomers() {
         flow_id: flow.id, merchant_id: flow.merchant_id, customer_id: c.id,
         current_node_id: firstEdge.target, next_run_at: new Date().toISOString(), status: 'active',
       }, { onConflict: 'flow_id,customer_id', ignoreDuplicates: true })
+    }
+  }
+}
+
+async function processPendingCampaignSends() {
+  // Pick up any campaign_sends that never got sent_at (batch failed or timed out)
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+  const { data: pending } = await supabaseAdmin
+    .from('campaign_sends')
+    .select('id, campaign_id, merchant_id, customer_id')
+    .is('sent_at', null)
+    .lt('created_at', cutoff)
+    .limit(500)
+  if (!pending?.length) return
+
+  const byCampaign: Record<string, typeof pending> = {}
+  for (const s of pending) {
+    if (!byCampaign[s.campaign_id]) byCampaign[s.campaign_id] = []
+    byCampaign[s.campaign_id].push(s)
+  }
+
+  for (const [campaignId, sends] of Object.entries(byCampaign)) {
+    const [campaignRes, merchantRes] = await Promise.all([
+      supabaseAdmin.from('campaigns').select('subject, body').eq('id', campaignId).single(),
+      supabaseAdmin.from('merchants').select('store_name, shopify_domain').eq('id', sends[0].merchant_id).single(),
+    ])
+    if (!campaignRes.data) continue
+
+    const storeName = merchantRes.data?.store_name || 'Our Store'
+    const shopifyDomain = merchantRes.data?.shopify_domain || ''
+    const customerIds = sends.map(s => s.customer_id)
+    const { data: customers } = await supabaseAdmin.from('customers')
+      .select('id, email, name, points, tier').in('id', customerIds)
+    if (!customers?.length) continue
+
+    const customerMap = Object.fromEntries(customers.map(c => [c.id, c]))
+
+    for (let i = 0; i < sends.length; i += BATCH_SIZE) {
+      const batch = sends.slice(i, i + BATCH_SIZE)
+      const emails = batch.flatMap(s => {
+        const c = customerMap[s.customer_id]
+        if (!c) return []
+        const firstName = (c.name || c.email).split(' ')[0]
+        const sub = (str: string) => str
+          .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
+          .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
+        return [buildCampaignEmailPayload(c.email, sub(campaignRes.data!.subject), sub(campaignRes.data!.body), campaignId, c.id, shopifyDomain)]
+      })
+      if (!emails.length) continue
+      try {
+        await resend.batch.send(emails)
+        await supabaseAdmin.from('campaign_sends').update({ sent_at: new Date().toISOString() })
+          .in('id', batch.map(s => s.id))
+      } catch {}
     }
   }
 }
@@ -157,6 +215,7 @@ export async function GET(req: NextRequest) {
 
   await enrollInactiveCustomers().catch(() => {})
   await enrollBirthdayCustomers().catch(() => {})
+  await processPendingCampaignSends().catch(() => {})
 
   const { data: enrollments } = await supabaseAdmin
     .from('automation_enrollments')

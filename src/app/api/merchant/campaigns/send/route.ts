@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendCampaignEmailHtml } from '@/lib/email'
+import { buildCampaignEmailPayload } from '@/lib/email'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+const BATCH_SIZE = 100
 
 function getMerchantId(req: NextRequest) {
   return req.cookies.get('merchant_session')?.value || null
@@ -70,17 +74,36 @@ export async function POST(req: NextRequest) {
   }
   if (!campaign) return NextResponse.json({ error: 'Campaign insert returned no data' }, { status: 500 })
 
-  await supabaseAdmin.from('campaign_sends').insert(
-    customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id }))
-  )
+  // Insert all campaign_sends with sent_at null — cron can recover any that fail
+  const { data: insertedSends } = await supabaseAdmin.from('campaign_sends')
+    .insert(customers.map(c => ({ campaign_id: campaign.id, merchant_id: merchantId, customer_id: c.id })))
+    .select('id, customer_id')
 
-  for (const c of customers) {
+  const sendIdMap: Record<string, string> = {}
+  for (const s of insertedSends || []) sendIdMap[s.customer_id] = s.id
+
+  // Build all email payloads
+  const payloads = customers.map(c => {
     const firstName = (c.name || c.email).split(' ')[0]
     const sub = (s: string) => s
       .replace(/\{\{name\}\}/g, firstName).replace(/\{\{points\}\}/g, String(c.points))
       .replace(/\{\{tier\}\}/g, c.tier).replace(/\{\{store\}\}/g, storeName)
-    await sendCampaignEmailHtml(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain)
+    return { customerId: c.id, email: buildCampaignEmailPayload(c.email, sub(subject), sub(emailBody), campaign.id, c.id, shopifyDomain) }
+  })
+
+  // Send in batches of 100 via Resend batch API
+  let sent = 0
+  for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+    const batch = payloads.slice(i, i + BATCH_SIZE)
+    try {
+      await resend.batch.send(batch.map(p => p.email))
+      sent += batch.length
+      const batchIds = batch.map(p => sendIdMap[p.customerId]).filter(Boolean)
+      if (batchIds.length) {
+        await supabaseAdmin.from('campaign_sends').update({ sent_at: new Date().toISOString() }).in('id', batchIds)
+      }
+    } catch {}
   }
 
-  return NextResponse.json({ ok: true, sent: customers.length, campaign: { ...campaign, attributed_orders: 0, attributed_revenue: 0, link_clicks: 0, revenue_per_email: 0 } })
+  return NextResponse.json({ ok: true, sent, campaign: { ...campaign, attributed_orders: 0, attributed_revenue: 0, link_clicks: 0, revenue_per_email: 0 } })
 }
