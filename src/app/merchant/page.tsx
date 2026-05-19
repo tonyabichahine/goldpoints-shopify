@@ -135,7 +135,7 @@ function MerchantDashboardInner() {
   const [flowsLoading, setFlowsLoading] = useState(false)
   const [creatingFlow, setCreatingFlow] = useState(false)
   const [newCampaign, setNewCampaign] = useState({ name: '', subject: '', body: '', segment: 'all' })
-  const [newAutomation, setNewAutomation] = useState({ trigger: 'signup', name: '', subject: '', body: '' })
+  const [newAutomation, setNewAutomation] = useState({ name: '' })
   const [campaignSending, setCampaignSending] = useState(false)
   const [campaignMsg, setCampaignMsg] = useState('')
   const [showAutoForm, setShowAutoForm] = useState(false)
@@ -219,10 +219,12 @@ function MerchantDashboardInner() {
   }
 
   async function addAutomation() {
-    if (!newAutomation.name || !newAutomation.subject || !newAutomation.body) return
-    const r = await fetch('/api/merchant/automations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAutomation) })
+    if (!newAutomation.name.trim()) return
+    setCreatingFlow(true)
+    const r = await fetch('/api/merchant/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newAutomation.name }) })
     const d = await r.json()
-    if (!d.error) { setAutomations(prev => [d, ...prev]); setNewAutomation({ trigger: 'signup', name: '', subject: '', body: '' }); setShowAutoForm(false) }
+    setCreatingFlow(false)
+    if (d.id) router.push(`/merchant/flows/${d.id}`)
   }
 
   async function toggleAutomation(id: string, active: boolean) {
@@ -713,34 +715,23 @@ function MerchantDashboardInner() {
                 <button onClick={() => setShowAutoForm(true)} className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition">+ Add Automation</button>
               )}
               {showAutoForm && (
-                <div className="bg-[#16162a] border border-purple-500/30 rounded-xl p-6 space-y-4">
-                  <h4 className="font-semibold text-sm text-gray-200">New Automation</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Trigger</label>
-                      <select value={newAutomation.trigger} onChange={e => setNewAutomation(p => ({...p, trigger: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm">
-                        <option value="signup">🎉 New Customer Signup</option>
-                        <option value="tier_silver">🥈 Customer reaches Silver</option>
-                        <option value="tier_gold">🥇 Customer reaches Gold</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Automation name</label>
-                      <input value={newAutomation.name} onChange={e => setNewAutomation(p => ({...p, name: e.target.value}))} placeholder="e.g. Welcome email" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
-                    </div>
+                <div className="bg-[#16162a] border border-purple-500/30 rounded-xl p-5 flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm text-gray-400 mb-1">Automation name</label>
+                    <input
+                      value={newAutomation.name}
+                      onChange={e => setNewAutomation({ name: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && addAutomation()}
+                      placeholder="e.g. Welcome series, Win-back flow…"
+                      autoFocus
+                      className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500"
+                    />
+                    <p className="text-xs text-gray-600 mt-1.5">You'll choose the trigger and build steps inside the editor →</p>
                   </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Subject</label>
-                    <input value={newAutomation.subject} onChange={e => setNewAutomation(p => ({...p, subject: e.target.value}))} placeholder="Welcome to {{store}} rewards!" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Email body</label>
-                    <textarea value={newAutomation.body} onChange={e => setNewAutomation(p => ({...p, body: e.target.value}))} rows={4} placeholder={'Hi {{name}},\n\nWelcome to our loyalty program! You start with {{points}} points.\n\n— {{store}}'} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm resize-y" />
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={addAutomation} className="bg-purple-600 hover:bg-purple-500 px-5 py-2 rounded-lg text-sm font-semibold">Save Automation</button>
-                    <button onClick={() => setShowAutoForm(false)} className="bg-white/5 hover:bg-white/10 px-5 py-2 rounded-lg text-sm">Cancel</button>
-                  </div>
+                  <button onClick={addAutomation} disabled={creatingFlow || !newAutomation.name.trim()} className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-semibold shrink-0">
+                    {creatingFlow ? 'Creating…' : 'Create →'}
+                  </button>
+                  <button onClick={() => { setShowAutoForm(false); setNewAutomation({ name: '' }) }} className="bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg text-sm shrink-0">Cancel</button>
                 </div>
               )}
             </div>
