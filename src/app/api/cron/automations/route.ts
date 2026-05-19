@@ -97,10 +97,14 @@ async function processEnrollment(enrollment: any) {
         currentNodeId = getNextNodeId(node.id, edges, result ? 'true' : 'false')
       } else if (node.type === 'addPoints') {
         const pts = node.data.points || 0
-        await supabaseAdmin.from('customers').update({ points: customer.points + pts }).eq('id', customer.id)
-        customer.points += pts
-        await supabaseAdmin.from('point_transactions').insert({ merchant_id: enrollment.merchant_id, customer_id: customer.id, type: 'earn_flow', points: pts, description: 'Loyalty flow bonus' })
         currentNodeId = getNextNodeId(node.id, edges)
+        // Advance DB position before awarding — crash after this misses the award once rather than doubling it
+        await supabaseAdmin.from('automation_enrollments').update({ current_node_id: currentNodeId, error_count: 0 }).eq('id', enrollment.id)
+        if (pts > 0) {
+          await supabaseAdmin.from('customers').update({ points: customer.points + pts }).eq('id', customer.id)
+          customer.points += pts
+          await supabaseAdmin.from('point_transactions').insert({ merchant_id: enrollment.merchant_id, customer_id: customer.id, type: 'earn_flow', points: pts, description: 'Loyalty flow bonus' })
+        }
       } else {
         currentNodeId = getNextNodeId(node.id, edges)
       }
