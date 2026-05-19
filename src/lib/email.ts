@@ -82,6 +82,7 @@ export function buildCampaignEmailPayload(
   const unsubLink = `${BASE_URL}/api/unsub?uid=${customerId}&mid=${merchantId}`
   const escaped = body
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+  const openPixel = `<img src="${BASE_URL}/api/track/open?cid=${campaignId}&uid=${customerId}" width="1" height="1" style="display:none" alt="" />`
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;margin:0;padding:24px}
     .wrap{max-width:560px;margin:0 auto;background:#1a1a2e;border-radius:16px;overflow:hidden;color:#e0e0f0}
@@ -94,7 +95,7 @@ export function buildCampaignEmailPayload(
   <body><div class="wrap">
     <div class="hdr"><h1>⭐ GoldPoints</h1></div>
     <div class="bdy">${escaped}${trackedBtn}</div>
-    <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a></div>
+    <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a>${openPixel}</div>
   </div></body></html>`
   const payload: { from: string; to: string; replyTo?: string; subject: string; html: string } = { from: buildFrom(storeName, customFromEmail), to: recipient, subject, html }
   if (replyTo) payload.replyTo = replyTo
@@ -142,6 +143,7 @@ export async function sendFlowEmail(
     ? `<div style="text-align:center;margin-top:24px"><a href="${BASE_URL}/api/track/click?eid=${enrollmentId}&url=${encodeURIComponent(storeUrl)}" style="display:inline-block;background:#6c3fff;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem">Shop Now →</a></div>`
     : ''
   const unsubLink = `${BASE_URL}/api/unsub?uid=${customerId}&mid=${merchantId}`
+  const openPixel = `<img src="${BASE_URL}/api/track/open?eid=${enrollmentId}" width="1" height="1" style="display:none" alt="" />`
   const escaped = body
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -156,7 +158,7 @@ export async function sendFlowEmail(
   <body><div class="wrap">
     <div class="hdr"><h1>⭐ GoldPoints</h1></div>
     <div class="bdy">${escaped}${trackedBtn}</div>
-    <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a></div>
+    <div class="ftr">You're receiving this as a loyalty member of this store. &nbsp;·&nbsp; <a href="${unsubLink}" style="color:#4b5563">Unsubscribe</a>${openPixel}</div>
   </div></body></html>`
   try {
     const payload: Parameters<typeof resend.emails.send>[0] = { from: buildFrom(storeName, customFromEmail), to: recipient, subject, html }

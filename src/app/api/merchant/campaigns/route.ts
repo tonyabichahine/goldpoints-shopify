@@ -12,9 +12,10 @@ export async function GET(req: NextRequest) {
   if (!campaigns?.length) return NextResponse.json([])
 
   const campaignIds = campaigns.map(c => c.id)
-  const [{ data: attributions }, { data: clicks }] = await Promise.all([
+  const [{ data: attributions }, { data: clicks }, { data: opens }] = await Promise.all([
     supabaseAdmin.from('campaign_attributions').select('campaign_id, revenue').eq('merchant_id', merchantId).in('campaign_id', campaignIds),
     supabaseAdmin.from('campaign_clicks').select('campaign_id').in('campaign_id', campaignIds),
+    supabaseAdmin.from('campaign_sends').select('campaign_id').in('campaign_id', campaignIds).not('opened_at', 'is', null),
   ])
 
   const attrMap: Record<string, { orders: number; revenue: number }> = {}
@@ -27,15 +28,21 @@ export async function GET(req: NextRequest) {
   for (const cl of clicks || []) {
     clickMap[cl.campaign_id] = (clickMap[cl.campaign_id] || 0) + 1
   }
+  const openMap: Record<string, number> = {}
+  for (const o of opens || []) {
+    openMap[o.campaign_id] = (openMap[o.campaign_id] || 0) + 1
+  }
 
   return NextResponse.json(campaigns.map(c => {
     const attributed_revenue = attrMap[c.id]?.revenue || 0
     const attributed_orders = attrMap[c.id]?.orders || 0
     const link_clicks = clickMap[c.id] || 0
+    const open_count = openMap[c.id] || 0
+    const open_rate = c.recipient_count > 0 ? parseFloat(((open_count / c.recipient_count) * 100).toFixed(1)) : 0
     const revenue_per_email = c.recipient_count > 0
       ? parseFloat((attributed_revenue / c.recipient_count).toFixed(2))
       : 0
-    return { ...c, attributed_orders, attributed_revenue, revenue_per_email, link_clicks }
+    return { ...c, attributed_orders, attributed_revenue, revenue_per_email, link_clicks, open_count, open_rate }
   }))
 }
 

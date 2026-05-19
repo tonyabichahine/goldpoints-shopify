@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
-interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number }
+interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
 interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
@@ -534,6 +534,7 @@ function MerchantDashboardInner() {
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">📧 {c.recipient_count.toLocaleString()}</span>
+                                {(c.open_rate ?? 0) > 0 && <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">👁 {c.open_rate}%</span>}
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">👆 {c.link_clicks} · {ctr}%</span>
                                 <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded-full">🛒 {c.attributed_orders}</span>
                               </div>
@@ -1112,6 +1113,7 @@ function MerchantDashboardInner() {
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { label: 'Emails Sent', value: c.recipient_count.toLocaleString(), icon: '📧', color: 'text-white' },
+                    { label: 'Opens', value: (c.open_count ?? 0).toLocaleString(), icon: '👁', color: 'text-sky-400', sub: `${c.open_rate ?? 0}% open rate` },
                     { label: 'Link Clicks', value: c.link_clicks.toLocaleString(), icon: '👆', color: 'text-blue-400', sub: `${ctr}% CTR` },
                     { label: 'Attributed Orders', value: c.attributed_orders.toLocaleString(), icon: '🛒', color: 'text-purple-400', sub: `${convRate}% conv. rate` },
                     { label: 'Revenue / Email', value: `$${rpe}`, icon: '📈', color: 'text-emerald-400' },

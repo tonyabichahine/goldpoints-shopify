@@ -47,6 +47,10 @@ export default function AdminPage() {
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
 
+  // Cron state
+  const [cronRunning, setCronRunning] = useState(false)
+  const [cronResult, setCronResult] = useState('')
+
   // Premium domain drawer state
   const [settingsMerchant, setSettingsMerchant] = useState<Merchant | null>(null)
   const [domainEmail, setDomainEmail] = useState('')
@@ -159,6 +163,14 @@ export default function AdminPage() {
     load()
   }
 
+  async function runCron() {
+    setCronRunning(true); setCronResult('')
+    const r = await fetch('/api/admin/run-cron', { method: 'POST' })
+    const d = await r.json()
+    setCronResult(d.error ? `Error: ${d.error}` : `Done — ${d.processed ?? 0} enrollments processed`)
+    setCronRunning(false)
+  }
+
   if (loading) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>
   if (!data) return null
 
@@ -186,6 +198,23 @@ export default function AdminPage() {
               <div className="text-xs text-gray-500 mt-1">{label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Automation Cron */}
+        <div className="bg-[#16162a] border border-white/10 rounded-xl p-5 mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-sm mb-1">Automation Cron</div>
+              <p className="text-xs text-gray-500 mb-2">Vercel Hobby runs this once per day. For hourly execution, add the URL below to <a href="https://cron-job.org" target="_blank" className="text-purple-400 hover:underline">cron-job.org</a> (free) set to every hour.</p>
+              <div className="bg-[#0f0f1a] rounded-lg px-3 py-2 text-xs font-mono text-gray-400 break-all">
+                https://goldpoints-shopify.vercel.app/api/cron/automations?secret=<span className="text-yellow-400">YOUR_CRON_SECRET</span>
+              </div>
+              {cronResult && <p className={`text-xs mt-2 ${cronResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{cronResult}</p>}
+            </div>
+            <button onClick={runCron} disabled={cronRunning} className="shrink-0 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-lg transition">
+              {cronRunning ? 'Running...' : 'Run Now'}
+            </button>
+          </div>
         </div>
 
         {/* Add Merchant */}

@@ -15,7 +15,8 @@ function getNextNodeId(nodeId: string, edges: any[], handleId?: string): string 
 
 function evaluateCondition(data: any, customer: any, enrollment?: any): boolean {
   if (data.conditionType === 'email_clicked') {
-    return !!enrollment?.last_email_click_at
+    if (!enrollment?.last_email_click_at || !enrollment?.last_email_sent_at) return false
+    return enrollment.last_email_click_at > enrollment.last_email_sent_at
   }
   const fieldMap: Record<string, number | string> = {
     points: customer.points || 0,
@@ -73,6 +74,10 @@ async function processEnrollment(enrollment: any) {
       } else {
         await sendEmail(customer.email, sub(node.data.subject || '(no subject)'), sub(node.data.body || ''))
       }
+      await supabaseAdmin.from('automation_enrollments')
+        .update({ last_email_sent_at: new Date().toISOString() })
+        .eq('id', enrollment.id)
+      enrollment.last_email_sent_at = new Date().toISOString()
       currentNodeId = getNextNodeId(node.id, edges)
     } else if (node.type === 'wait') {
       const ms = (node.data.unit === 'hours' ? 3600000 : 86400000) * (node.data.amount || 1)
@@ -225,7 +230,7 @@ export async function GET(req: NextRequest) {
 
   const { data: enrollments } = await supabaseAdmin
     .from('automation_enrollments')
-    .select('id, flow_id, customer_id, merchant_id, current_node_id, last_email_click_at')
+    .select('id, flow_id, customer_id, merchant_id, current_node_id, last_email_click_at, last_email_sent_at')
     .eq('status', 'active')
     .lte('next_run_at', new Date().toISOString())
     .limit(100)
