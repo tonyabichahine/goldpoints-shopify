@@ -19,6 +19,7 @@ interface Merchant {
   resend_domain_id: string | null
   custom_domain_status: string | null
   whatsapp_credits: number
+  whatsapp_phone_number_id: string | null
 }
 
 interface DnsRecord {
@@ -64,6 +65,10 @@ export default function AdminPage() {
   const [domainMsg, setDomainMsg] = useState('')
   const [addCredits, setAddCredits] = useState('')
   const [creditsMsg, setCreditsMsg] = useState('')
+  const [waPhoneId, setWaPhoneId] = useState('')
+  const [waToken, setWaToken] = useState('')
+  const [waSaving, setWaSaving] = useState(false)
+  const [waMsg, setWaMsg] = useState('')
 
   useEffect(() => { load(); loadCronStatus(); loadEnrollmentStats() }, [])
 
@@ -511,6 +516,56 @@ export default function AdminPage() {
                   >Add</button>
                 </div>
                 {creditsMsg && <p className="text-xs text-green-400">{creditsMsg}</p>}
+              </div>
+
+              {/* WhatsApp API Credentials */}
+              <div className="border-t border-white/10 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-white">WhatsApp API Setup</div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${settingsMerchant.whatsapp_phone_number_id ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
+                    {settingsMerchant.whatsapp_phone_number_id ? '✓ Connected' : 'Not configured'}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Phone Number ID</label>
+                  <input
+                    value={waPhoneId}
+                    onChange={e => setWaPhoneId(e.target.value)}
+                    placeholder={settingsMerchant.whatsapp_phone_number_id ? '(already set — paste to replace)' : '1234567890'}
+                    className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Access Token</label>
+                  <input
+                    type="password"
+                    value={waToken}
+                    onChange={e => setWaToken(e.target.value)}
+                    placeholder="EAAxxxxxxx…"
+                    className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500"
+                  />
+                </div>
+                {waMsg && <p className={`text-xs ${waMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{waMsg}</p>}
+                <button
+                  disabled={waSaving || (!waPhoneId && !waToken)}
+                  onClick={async () => {
+                    setWaSaving(true); setWaMsg('')
+                    const body: Record<string, string> = { id: settingsMerchant.id }
+                    if (waPhoneId) body.whatsapp_phone_number_id = waPhoneId
+                    if (waToken) body.whatsapp_token = waToken
+                    const r = await fetch('/api/admin/merchants', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                    setWaSaving(false)
+                    if (r.ok) {
+                      if (waPhoneId) setSettingsMerchant(m => m ? { ...m, whatsapp_phone_number_id: waPhoneId } : m)
+                      setWaPhoneId(''); setWaToken('')
+                      setWaMsg('✓ Credentials saved')
+                      setTimeout(() => setWaMsg(''), 3000)
+                    } else { setWaMsg('Save failed') }
+                  }}
+                  className="w-full bg-green-800 hover:bg-green-700 disabled:opacity-40 py-2 rounded-lg text-sm font-semibold transition"
+                >
+                  {waSaving ? 'Saving…' : 'Save WhatsApp Credentials'}
+                </button>
               </div>
             </div>
           </div>

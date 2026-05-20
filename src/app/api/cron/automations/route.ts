@@ -44,7 +44,7 @@ async function processEnrollment(enrollment: any) {
     const [flowRes, customerRes, merchantRes] = await Promise.all([
       supabaseAdmin.from('automation_flows').select('nodes, edges').eq('id', enrollment.flow_id).single(),
       supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points, marketing_consent, whatsapp_consent, phone').eq('id', enrollment.customer_id).single(),
-      supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email, whatsapp_credits').eq('id', enrollment.merchant_id).single(),
+      supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email, whatsapp_credits, whatsapp_phone_number_id, whatsapp_token').eq('id', enrollment.merchant_id).single(),
     ])
 
     if (!flowRes.data || !customerRes.data) {
@@ -60,6 +60,8 @@ async function processEnrollment(enrollment: any) {
     const merchantEmail = merchantRes.data?.email || ''
     const customFromEmail = merchantRes.data?.is_premium && merchantRes.data?.custom_from_email ? merchantRes.data.custom_from_email : undefined
     let whatsappCredits: number = merchantRes.data?.whatsapp_credits || 0
+    const whatsappPhoneNumberId: string = merchantRes.data?.whatsapp_phone_number_id || ''
+    const whatsappToken: string = merchantRes.data?.whatsapp_token || ''
 
     const sub = (s: string) => (s || '')
       .replace(/\{\{name\}\}/g, (customer.name || customer.email).split(' ')[0])
@@ -96,8 +98,10 @@ async function processEnrollment(enrollment: any) {
         await supabaseAdmin.from('automation_enrollments')
           .update({ current_node_id: currentNodeId, error_count: 0 })
           .eq('id', enrollment.id)
-        if (customer.whatsapp_consent !== false && customer.phone && whatsappCredits > 0) {
-          await sendWhatsApp(customer.phone, sub(node.data.body || ''))
+        if (customer.whatsapp_consent !== false && customer.phone && whatsappCredits > 0 && whatsappPhoneNumberId && whatsappToken) {
+          const templateName = (node.data.templateName as string) || 'goldpoints_points_earned'
+          const firstName = (customer.name || customer.email).split(' ')[0]
+          await sendWhatsApp(customer.phone, templateName, [firstName, storeName, String(customer.points), customer.tier], whatsappPhoneNumberId, whatsappToken)
           await supabaseAdmin.from('merchants')
             .update({ whatsapp_credits: Math.max(0, whatsappCredits - 1) })
             .eq('id', enrollment.merchant_id)

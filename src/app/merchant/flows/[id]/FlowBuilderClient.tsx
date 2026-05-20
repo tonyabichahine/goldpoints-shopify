@@ -102,13 +102,23 @@ function AddPointsNode({ data, selected }: NodeProps) {
   )
 }
 
+const WHATSAPP_TEMPLATES = [
+  { name: 'goldpoints_welcome',      label: 'Welcome Message',  preview: 'Hi [Name], welcome to [Store]! You\'ve earned [Points] bonus points just for joining. 🎉 Keep shopping to earn more!', desc: 'Best for: signup trigger' },
+  { name: 'goldpoints_birthday',     label: 'Birthday Greeting', preview: '🎂 Happy Birthday [Name]! As a special gift from [Store], you\'ve received [Points] bonus points. Enjoy your day!', desc: 'Best for: birthday trigger' },
+  { name: 'goldpoints_points_earned', label: 'Points Update',   preview: 'Hi [Name], great news! You\'ve earned points at [Store] and now have [Points] points total. Keep it up! ⭐', desc: 'Best for: any action trigger' },
+  { name: 'goldpoints_reward_ready', label: 'Reward Available', preview: 'Hi [Name], you\'ve reached [Points] points at [Store] — enough to redeem a reward! Visit the store to claim it. 🎁', desc: 'Best for: points milestone trigger' },
+  { name: 'goldpoints_win_back',     label: 'Win-Back',         preview: 'Hey [Name], we miss you at [Store]! You still have [Points] points waiting. Come back and treat yourself! 💛', desc: 'Best for: inactivity triggers' },
+]
+const WA_TEMPLATE_MAP = Object.fromEntries(WHATSAPP_TEMPLATES.map(t => [t.name, t]))
+
 function WhatsAppNode({ data, selected }: NodeProps) {
+  const tpl = WA_TEMPLATE_MAP[(data.templateName as string) || '']
   return (
     <div className={`rounded-xl px-4 py-3 min-w-[200px] border-2 ${selected ? 'border-green-400' : 'border-green-600/50'}`}
       style={{ background: '#16162a' }}>
       <Handle type="target" position={Position.Top} className="!bg-green-400 !w-3 !h-3" />
       <div className="text-[10px] uppercase tracking-widest text-green-400 mb-1">💬 WhatsApp</div>
-      <div className="font-semibold text-sm text-white truncate">{(data.body as string) ? String(data.body).substring(0, 40) + '…' : 'No message'}</div>
+      <div className="font-semibold text-sm text-white truncate">{tpl ? tpl.label : 'Select template'}</div>
       <Handle type="source" position={Position.Bottom} className="!bg-green-400 !w-3 !h-3" />
     </div>
   )
@@ -247,15 +257,28 @@ function ConfigPanel({ node, onChange, onClose, onDelete, merchantEmail }: {
         {node.type === 'whatsapp' && (
           <>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Message</label>
-              <p className="text-[10px] text-gray-600 mb-1">{'{{name}} {{points}} {{tier}} {{store}}'}</p>
-              <textarea value={(d.body as string) || ''} onChange={e => setD(p => ({ ...p, body: e.target.value }))}
-                rows={6} placeholder={'Hi {{name}}, you have {{points}} points at {{store}}! 🎉'}
-                className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500 resize-none" />
+              <label className="block text-xs text-gray-400 mb-1">Template</label>
+              <select value={(d.templateName as string) || 'goldpoints_points_earned'}
+                onChange={e => setD(p => ({ ...p, templateName: e.target.value }))}
+                className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500">
+                {WHATSAPP_TEMPLATES.map(t => <option key={t.name} value={t.name}>{t.label}</option>)}
+              </select>
             </div>
+            {(() => {
+              const tpl = WA_TEMPLATE_MAP[(d.templateName as string) || 'goldpoints_points_earned']
+              return tpl ? (
+                <div className="bg-[#0f0f1a] rounded-lg p-3 space-y-2">
+                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">Preview</div>
+                  <div className="text-xs text-gray-300 leading-relaxed">{tpl.preview}</div>
+                  <div className="text-[10px] text-green-500">{tpl.desc}</div>
+                  <div className="text-[10px] text-gray-600">[Name] [Store] [Points] filled automatically at send time</div>
+                </div>
+              ) : null
+            })()}
             <div className="bg-[#0f0f1a] rounded-lg p-3 text-xs text-gray-500 space-y-1">
               <div>Only sends to customers who opted in to WhatsApp</div>
               <div>Requires merchant WhatsApp credits</div>
+              <div>Uses Meta-approved message templates</div>
             </div>
           </>
         )}
@@ -488,6 +511,7 @@ function FlowBuilder() {
     const defaults: Record<string, Record<string, unknown>> = {
       trigger: { triggerType: subType || 'signup' },
       email: { subject: '', body: '' },
+      whatsapp: { templateName: 'goldpoints_points_earned' },
       wait: { amount: 1, unit: 'days' },
       condition: { field: 'points', operator: '>=', value: '500' },
       addPoints: { points: 100 },
