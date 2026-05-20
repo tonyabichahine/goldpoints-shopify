@@ -57,6 +57,11 @@ export default function AdminPage() {
   const [enrollmentStats, setEnrollmentStats] = useState<{ errorCount: number; activeCount: number } | null>(null)
   const [resettingErrors, setResettingErrors] = useState(false)
 
+  // Deleted customers
+  const [deletedCustomers, setDeletedCustomers] = useState<any[]>([])
+  const [deletedLoading, setDeletedLoading] = useState(false)
+  const [deletedActing, setDeletedActing] = useState<string | null>(null)
+
   // Premium domain drawer state
   const [settingsMerchant, setSettingsMerchant] = useState<Merchant | null>(null)
   const [domainEmail, setDomainEmail] = useState('')
@@ -72,7 +77,7 @@ export default function AdminPage() {
   const [waSaving, setWaSaving] = useState(false)
   const [waMsg, setWaMsg] = useState('')
 
-  useEffect(() => { load(); loadCronStatus(); loadEnrollmentStats() }, [])
+  useEffect(() => { load(); loadCronStatus(); loadEnrollmentStats(); loadDeletedCustomers() }, [])
 
   async function load() {
     setLoading(true)
@@ -193,6 +198,26 @@ export default function AdminPage() {
     setCronResult(d.error ? `Error: ${d.error}` : `Done — ${d.processed ?? 0} enrollments processed`)
     setCronRunning(false)
     loadCronStatus(); loadEnrollmentStats()
+  }
+
+  async function loadDeletedCustomers() {
+    setDeletedLoading(true)
+    const r = await fetch('/api/admin/deleted-customers')
+    if (r.ok) setDeletedCustomers(await r.json())
+    setDeletedLoading(false)
+  }
+
+  async function actOnDeletedCustomer(id: string, action: 'restore' | 'delete') {
+    if (action === 'delete' && !confirm('Permanently delete this customer? This cannot be undone.')) return
+    setDeletedActing(id)
+    await fetch('/api/admin/deleted-customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action }),
+    })
+    setDeletedActing(null)
+    loadDeletedCustomers()
+    load()
   }
 
   async function resetErrors() {
@@ -383,6 +408,68 @@ export default function AdminPage() {
             </table>
           </div>
         )}
+        {/* Deleted Customers Log */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-red-400">Deleted Customers Log</h2>
+            <span className="text-xs text-gray-500">{deletedCustomers.length} total</span>
+          </div>
+          {deletedLoading ? (
+            <div className="text-gray-500 text-sm py-4">Loading...</div>
+          ) : deletedCustomers.length === 0 ? (
+            <div className="bg-[#16162a] border border-white/10 rounded-xl p-8 text-center text-gray-500 text-sm">
+              No deleted customers.
+            </div>
+          ) : (
+            <div className="bg-[#16162a] border border-white/10 rounded-xl overflow-x-auto">
+              <table className="w-full text-sm min-w-[800px]">
+                <thead className="bg-[#1f1f3a]">
+                  <tr>
+                    {['Store', 'Name', 'Email', 'Points', 'Tier', 'Deleted At', 'Actions'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {deletedCustomers.map((c: any) => (
+                    <tr key={c.id} className="border-t border-white/5 hover:bg-white/5">
+                      <td className="px-4 py-3 text-yellow-400 font-semibold text-xs">{c.merchants?.store_name || '—'}</td>
+                      <td className="px-4 py-3">{c.name || <span className="text-gray-600">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-400">{c.email}</td>
+                      <td className="px-4 py-3 text-yellow-300">{c.points?.toLocaleString()}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          c.tier === 'Gold' ? 'bg-yellow-900 text-yellow-400' :
+                          c.tier === 'Silver' ? 'bg-gray-700 text-gray-300' :
+                          'bg-orange-900/40 text-orange-400'
+                        }`}>{c.tier || 'Bronze'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.deleted_at).toLocaleDateString()} {new Date(c.deleted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => actOnDeletedCustomer(c.id, 'restore')}
+                            disabled={deletedActing === c.id}
+                            className="text-xs px-3 py-1 rounded-lg border border-green-500 text-green-400 hover:bg-green-500/10 transition disabled:opacity-40"
+                          >
+                            {deletedActing === c.id ? '...' : 'Restore'}
+                          </button>
+                          <button
+                            onClick={() => actOnDeletedCustomer(c.id, 'delete')}
+                            disabled={deletedActing === c.id}
+                            className="text-xs px-3 py-1 rounded-lg border border-red-500 text-red-400 hover:bg-red-500/10 transition disabled:opacity-40"
+                          >
+                            {deletedActing === c.id ? '...' : 'Delete Forever'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Premium Settings Drawer */}
