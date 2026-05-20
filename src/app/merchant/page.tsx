@@ -433,12 +433,13 @@ function MerchantDashboardInner() {
 
       <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
         <div className="flex gap-2 flex-wrap">
-          {(['overview','customers','offers','campaigns','flows','settings'] as const).map(t => (
+          {(['overview','customers','offers','campaigns','flows'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
           ))}
           <button onClick={() => setTab('whatsapp')} className={`px-4 py-2 rounded-full text-sm transition flex items-center gap-1.5 ${tab === 'whatsapp' ? 'bg-green-700 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>
             💬 WhatsApp {!merchant?.is_premium && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full">PRO</span>}
           </button>
+          <button onClick={() => setTab('settings')} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === 'settings' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>settings</button>
         </div>
         <button onClick={() => setAiChat(p => ({ ...p, open: true }))} className="flex items-center gap-1.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-full text-sm font-semibold transition shrink-0 ml-4">
           <span>✦</span> AI
