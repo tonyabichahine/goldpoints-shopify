@@ -21,6 +21,15 @@ export async function PATCH(req: NextRequest) {
     update.whatsapp_credits = (m?.whatsapp_credits || 0) + add_whatsapp_credits
   }
   await supabaseAdmin.from('merchants').update(update).eq('id', id)
+
+  // Subscribe the WABA to our webhook whenever credentials are saved
+  if (whatsapp_waba_id && whatsapp_token) {
+    await fetch(`https://graph.facebook.com/v18.0/${whatsapp_waba_id}/subscribed_apps`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${whatsapp_token}` },
+    }).catch(() => {})
+  }
+
   return NextResponse.json({ ok: true })
 }
 

@@ -132,6 +132,8 @@ function MerchantDashboardInner() {
   const [waForm, setWaForm] = useState({ name: '', category: 'MARKETING', body: '' })
   const [waSubmitting, setWaSubmitting] = useState(false)
   const [waMsg, setWaMsg] = useState('')
+  const [waConnecting, setWaConnecting] = useState(false)
+  const [waConnectMsg, setWaConnectMsg] = useState('')
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
@@ -179,6 +181,75 @@ function MerchantDashboardInner() {
     const r = await fetch('/api/merchant/whatsapp-templates')
     if (r.ok) setWaTemplates(await r.json())
     setWaLoading(false)
+  }
+
+  function connectWhatsApp() {
+    const fb = (window as any).FB
+    if (!fb) {
+      // Load FB SDK if not yet loaded
+      const script = document.createElement('script')
+      script.src = 'https://connect.facebook.net/en_US/sdk.js'
+      script.async = true
+      script.onload = () => {
+        fb?.init?.({ appId: '1641237980517889', version: 'v18.0', xfbml: false, autoLogAppEvents: false })
+        setTimeout(connectWhatsApp, 500)
+      }
+      document.head.appendChild(script)
+      return
+    }
+
+    setWaConnecting(true)
+    setWaConnectMsg('')
+
+    let wabaId = ''
+    let phoneNumberId = ''
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return
+      try {
+        const data = JSON.parse(event.data as string)
+        if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
+          wabaId = data.data.waba_id
+          phoneNumberId = data.data.phone_number_id
+        }
+      } catch {}
+    }
+
+    window.addEventListener('message', handleMessage)
+
+    fb.login(async (response: any) => {
+      window.removeEventListener('message', handleMessage)
+      const code = response.authResponse?.code
+      if (!code) {
+        setWaConnectMsg('Connection cancelled.')
+        setWaConnecting(false)
+        return
+      }
+      try {
+        const r = await fetch('/api/merchant/whatsapp-connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId }),
+        })
+        const d = await r.json()
+        if (r.ok) {
+          setWaConnectMsg('✓ WhatsApp connected!')
+          const m = await fetch('/api/merchant/me')
+          const md = await m.json()
+          if (!md.error) setMerchant(md)
+        } else {
+          setWaConnectMsg(`Error: ${d.error || 'Connection failed'}`)
+        }
+      } catch {
+        setWaConnectMsg('Connection failed. Please try again.')
+      }
+      setWaConnecting(false)
+    }, {
+      config_id: 'trnm2002',
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: { setup: {}, featureName: 'whatsapp_embedded_signup', sessionInfoVersion: '3' },
+    })
   }
 
   async function loadCustomers() {
@@ -848,6 +919,16 @@ function MerchantDashboardInner() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-green-400">💬 WhatsApp Templates</h2>
+              <div className="flex items-center gap-2">
+                {merchant.whatsapp_waba_id && (
+                  <button
+                    onClick={connectWhatsApp}
+                    disabled={waConnecting}
+                    className="text-xs border border-green-800 hover:border-green-600 px-3 py-1.5 rounded-lg text-green-500 hover:text-green-400 transition disabled:opacity-40"
+                  >
+                    {waConnecting ? 'Connecting…' : '↺ Reconnect'}
+                  </button>
+                )}
               <button
                 disabled={waSyncing || !merchant.whatsapp_waba_id}
                 onClick={async () => {
@@ -860,13 +941,22 @@ function MerchantDashboardInner() {
               >
                 {waSyncing ? 'Syncing…' : '↻ Sync Status'}
               </button>
+              </div>
             </div>
 
             {!merchant.whatsapp_waba_id && (
-              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 text-center">
-                <div className="text-3xl mb-3">💬</div>
-                <div className="text-white font-semibold mb-1">WhatsApp not configured yet</div>
-                <div className="text-sm text-gray-500">Contact us to get your WhatsApp Business account connected. Once set up, you can create and submit templates here.</div>
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-8 text-center">
+                <div className="text-4xl mb-4">💬</div>
+                <div className="text-white font-semibold text-lg mb-2">Connect Your WhatsApp Business Account</div>
+                <div className="text-sm text-gray-400 mb-6 max-w-sm mx-auto">Click below to connect your Meta WhatsApp Business account in a few quick steps.</div>
+                <button
+                  onClick={connectWhatsApp}
+                  disabled={waConnecting}
+                  className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-semibold px-6 py-3 rounded-xl transition"
+                >
+                  {waConnecting ? 'Connecting…' : '🔗 Connect WhatsApp'}
+                </button>
+                {waConnectMsg && <p className={`text-sm mt-3 ${waConnectMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{waConnectMsg}</p>}
               </div>
             )}
 
