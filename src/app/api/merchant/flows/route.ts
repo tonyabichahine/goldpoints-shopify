@@ -14,13 +14,28 @@ export async function GET(req: NextRequest) {
     const { data } = await supabaseAdmin.from('automation_flows').select('*').eq('id', id).eq('merchant_id', merchantId).single()
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (analytics) {
-      const { data: enrollments } = await supabaseAdmin
-        .from('automation_enrollments').select('status').eq('flow_id', id)
+      const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString()
+      const [{ data: enrollments }, { data: recent }] = await Promise.all([
+        supabaseAdmin.from('automation_enrollments').select('status').eq('flow_id', id),
+        supabaseAdmin.from('automation_enrollments').select('enrolled_at').eq('flow_id', id).gte('enrolled_at', cutoff30),
+      ])
       const total = enrollments?.length || 0
       const active = enrollments?.filter(e => e.status === 'active').length || 0
       const completed = enrollments?.filter(e => e.status === 'completed').length || 0
       const error = enrollments?.filter(e => e.status === 'error').length || 0
-      return NextResponse.json({ ...data, analytics: { total, active, completed, error } })
+
+      const dayCountMap: Record<string, number> = {}
+      for (const e of recent || []) {
+        const key = (e.enrolled_at as string).substring(0, 10)
+        dayCountMap[key] = (dayCountMap[key] || 0) + 1
+      }
+      const trend: { date: string; value: number }[] = []
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000)
+        trend.push({ date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: dayCountMap[d.toISOString().substring(0, 10)] || 0 })
+      }
+
+      return NextResponse.json({ ...data, analytics: { total, active, completed, error, trend } })
     }
     return NextResponse.json(data)
   }

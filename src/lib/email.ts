@@ -190,11 +190,13 @@ export async function enrollInFlows(merchantId: string, customerId: string, trig
         await supabaseAdmin.from('automation_enrollments').upsert({
           flow_id: flow.id, merchant_id: merchantId, customer_id: customerId,
           current_node_id: firstEdge.target, next_run_at: new Date().toISOString(), status: 'active',
+          enrolled_at: new Date().toISOString(),
         }, { onConflict: 'flow_id,customer_id' })
       } else {
         await supabaseAdmin.from('automation_enrollments').upsert({
           flow_id: flow.id, merchant_id: merchantId, customer_id: customerId,
           current_node_id: firstEdge.target, next_run_at: new Date().toISOString(), status: 'active',
+          enrolled_at: new Date().toISOString(),
         }, { onConflict: 'flow_id,customer_id', ignoreDuplicates: true })
       }
     }

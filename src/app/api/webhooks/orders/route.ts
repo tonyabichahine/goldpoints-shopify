@@ -127,5 +127,43 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // First purchase + points milestone triggers — run async so they don't slow the webhook response
+  ;(async () => {
+    try {
+      const { count: earnCount } = await supabaseAdmin
+        .from('point_transactions').select('*', { count: 'exact', head: true })
+        .eq('merchant_id', merchant.id).eq('customer_id', customer.id).eq('type', 'earn_purchase')
+      if ((earnCount || 0) === 1) {
+        enrollInFlows(merchant.id, customer.id, 'first_purchase').catch(() => {})
+      }
+
+      const { data: milestoneFlows } = await supabaseAdmin
+        .from('automation_flows').select('id, nodes, edges, allow_reenroll')
+        .eq('merchant_id', merchant.id).eq('trigger', 'points_milestone').eq('active', true)
+      for (const flow of milestoneFlows || []) {
+        const nodes: any[] = flow.nodes || []
+        const edges: any[] = flow.edges || []
+        const triggerNode = nodes.find((n: any) => n.type === 'trigger')
+        const milestone = triggerNode?.data?.milestoneValue
+        if (!milestone || typeof milestone !== 'number') continue
+        // Only enroll when the customer just crossed this specific threshold
+        if (customer.points < milestone && newPoints >= milestone) {
+          const firstEdge = triggerNode ? edges.find((e: any) => e.source === triggerNode.id) : null
+          if (!firstEdge) continue
+          const payload = {
+            flow_id: flow.id, merchant_id: merchant.id, customer_id: customer.id,
+            current_node_id: firstEdge.target, next_run_at: new Date().toISOString(),
+            status: 'active', enrolled_at: new Date().toISOString(),
+          }
+          if (flow.allow_reenroll) {
+            await supabaseAdmin.from('automation_enrollments').upsert(payload, { onConflict: 'flow_id,customer_id' })
+          } else {
+            await supabaseAdmin.from('automation_enrollments').upsert(payload, { onConflict: 'flow_id,customer_id', ignoreDuplicates: true })
+          }
+        }
+      }
+    } catch {}
+  })()
+
   return NextResponse.json({ ok: true })
 }

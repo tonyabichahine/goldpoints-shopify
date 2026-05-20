@@ -132,6 +132,7 @@ function MerchantDashboardInner() {
   const [campaignDetail, setCampaignDetail] = useState<Campaign | null>(null)
   const [campaignSort, setCampaignSort] = useState<'recent' | 'revenue_high' | 'revenue_low' | 'clicks'>('recent')
   const [flowDetail, setFlowDetail] = useState<FlowSummary | null>(null)
+  const [flowAnalytics, setFlowAnalytics] = useState<{ total: number; active: number; completed: number; error: number; trend: { date: string; value: number }[] } | null>(null)
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -156,6 +157,14 @@ function MerchantDashboardInner() {
     if (tab === 'campaigns') { loadCampaigns() }
     if (tab === 'flows') loadFlows()
   }, [tab])
+
+  useEffect(() => {
+    if (!flowDetail) { setFlowAnalytics(null); return }
+    fetch(`/api/merchant/flows?id=${flowDetail.id}&analytics=1`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.analytics) setFlowAnalytics(d.analytics) })
+      .catch(() => {})
+  }, [flowDetail?.id])
 
   async function loadCustomers() {
     const r = await fetch('/api/merchant/customers')
@@ -1085,6 +1094,9 @@ function MerchantDashboardInner() {
                       <div className="text-xs text-gray-500 mt-0.5">Failed 3 times — reset from Admin panel to retry</div>
                     </div>
                   </div>
+                )}
+                {flowAnalytics?.trend && (
+                  <BarChart title="Enrollments — Last 30 Days" data={flowAnalytics.trend} color="#a78bfa" />
                 )}
                 <button onClick={() => { setFlowDetail(null); router.push(`/merchant/flows/${f.id}`) }}
                   className="w-full text-center text-xs text-gray-500 hover:text-white transition py-2 border border-white/10 hover:border-white/25 rounded-lg">
