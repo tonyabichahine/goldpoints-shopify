@@ -143,6 +143,7 @@ function MerchantDashboardInner() {
   const [flowDetail, setFlowDetail] = useState<FlowSummary | null>(null)
   const [flowAnalytics, setFlowAnalytics] = useState<{ total: number; active: number; completed: number; error: number; trend: { date: string; value: number }[]; email_sends: number; whatsapp_sends: number; email_revenue: number; whatsapp_revenue: number } | null>(null)
   const [flowPeriod, setFlowPeriod] = useState('30')
+  const [flowTest, setFlowTest] = useState<{ email: string; running: boolean; log: string[] }>({ email: '', running: false, log: [] })
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -170,6 +171,7 @@ function MerchantDashboardInner() {
   }, [tab])
 
   useEffect(() => {
+    setFlowTest({ email: '', running: false, log: [] })
     if (!flowDetail) { setFlowAnalytics(null); return }
     fetch(`/api/merchant/flows?id=${flowDetail.id}&analytics=1&period=${flowPeriod}`)
       .then(r => r.ok ? r.json() : null)
@@ -1114,6 +1116,7 @@ function MerchantDashboardInner() {
                 <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Birthday bonus points</label><input type="number" value={(merchant as any).birthday_bonus || 0} onChange={e => setMerchant(p => p ? {...p, birthday_bonus: +e.target.value} as any : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
                 <div className="border-t border-white/10 pt-4">
                   <p className="text-xs text-gray-500 mb-3">Points Multiplier — how many times the base earn rate each tier receives on purchases.</p>
                   <div className="grid grid-cols-3 gap-4">
@@ -1400,6 +1403,41 @@ function MerchantDashboardInner() {
                 {flowAnalytics?.trend && (
                   <BarChart title="Enrollments — Last 30 Days" data={flowAnalytics.trend} color="#a78bfa" />
                 )}
+                {/* Test runner */}
+                <div className="bg-[#0f0f1a] border border-purple-500/20 rounded-xl p-4 space-y-3">
+                  <div className="text-sm font-semibold text-purple-300">▶ Run Test</div>
+                  <div className="text-xs text-gray-500">Instantly runs this flow for a customer — emails and WhatsApp messages will actually send.</div>
+                  <div className="flex gap-2">
+                    <input
+                      value={flowTest.email}
+                      onChange={e => setFlowTest(p => ({ ...p, email: e.target.value, log: [] }))}
+                      placeholder="customer@email.com"
+                      className="flex-1 bg-[#16162a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50"
+                    />
+                    <button
+                      disabled={flowTest.running || !flowTest.email}
+                      onClick={async () => {
+                        setFlowTest(p => ({ ...p, running: true, log: [] }))
+                        const r = await fetch('/api/merchant/flows/test', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ flow_id: f.id, customer_email: flowTest.email }),
+                        })
+                        const d = await r.json()
+                        setFlowTest(p => ({ ...p, running: false, log: r.ok ? d.log : [`✗ ${d.error}`] }))
+                      }}
+                      className="bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white text-xs font-semibold px-4 py-2 rounded-lg transition"
+                    >
+                      {flowTest.running ? 'Running…' : 'Run'}
+                    </button>
+                  </div>
+                  {flowTest.log.length > 0 && (
+                    <div className="space-y-1">
+                      {flowTest.log.map((line, i) => <div key={i} className="text-xs text-gray-300 font-mono">{line}</div>)}
+                    </div>
+                  )}
+                </div>
+
                 <button onClick={() => { setFlowDetail(null); router.push(`/merchant/flows/${f.id}`) }}
                   className="w-full text-center text-xs text-gray-500 hover:text-white transition py-2 border border-white/10 hover:border-white/25 rounded-lg">
                   Open in Flow Builder →

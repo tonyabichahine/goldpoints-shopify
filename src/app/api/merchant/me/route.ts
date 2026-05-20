@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants')
-    .select('id, store_name, shopify_domain, email, widget_primary_color, widget_btn_text_color, widget_position, widget_offset_bottom, widget_offset_side, widget_title, points_per_dollar, signup_bonus, social_follow_url, follow_points, referral_points, shopify_access_token, whatsapp_phone_number_id, whatsapp_waba_id, whatsapp_credits, is_premium, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
+    .select('id, store_name, shopify_domain, email, widget_primary_color, widget_btn_text_color, widget_position, widget_offset_bottom, widget_offset_side, widget_title, points_per_dollar, signup_bonus, birthday_bonus, social_follow_url, follow_points, referral_points, shopify_access_token, whatsapp_phone_number_id, whatsapp_waba_id, whatsapp_credits, is_premium, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
     .eq('id', merchantId)
     .single()
 
