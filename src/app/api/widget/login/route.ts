@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -9,6 +10,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const { limited } = await checkRateLimit(req)
+  if (limited) return NextResponse.json({ error: 'Too many attempts. Try again in a minute.' }, { status: 429, headers: cors })
+
   const { shop, email, password } = await req.json()
   if (!shop || !email || !password) return NextResponse.json({ error: 'Email and password are required.' }, { status: 400, headers: cors })
 

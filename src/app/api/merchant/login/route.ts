@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 export async function POST(req: NextRequest) {
+  const { limited } = await checkRateLimit(req)
+  if (limited) return NextResponse.json({ error: 'Too many attempts. Try again in a minute.' }, { status: 429 })
+
   const { email, password } = await req.json()
   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 

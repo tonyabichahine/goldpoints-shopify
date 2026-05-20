@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import crypto from 'crypto'
 import { Resend } from 'resend'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
+  const { limited } = await checkRateLimit(req)
+  if (limited) return NextResponse.json({ error: 'Too many attempts. Try again in a minute.' }, { status: 429 })
+
   const { email } = await req.json()
   if (!email) return NextResponse.json({ ok: true }) // silent — no enumeration
 
