@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
@@ -145,6 +145,19 @@ function MerchantDashboardInner() {
   const [flowPeriod, setFlowPeriod] = useState('30')
   const [flowTest, setFlowTest] = useState<{ email: string; running: boolean; log: string[] }>({ email: '', running: false, log: [] })
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerDetail, setCustomerDetail] = useState<any | null>(null)
+  const [customerDetailHistory, setCustomerDetailHistory] = useState<any[]>([])
+  const [customerDetailLoading, setCustomerDetailLoading] = useState(false)
+  const [customerDetailEdits, setCustomerDetailEdits] = useState<{ name: string; phone: string; birthday: string; pointsAdjust: string }>({ name: '', phone: '', birthday: '', pointsAdjust: '0' })
+  const [customerDetailSaving, setCustomerDetailSaving] = useState(false)
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false)
+  const [addCustomerForm, setAddCustomerForm] = useState({ name: '', email: '', phone: '', birthday: '', points: '0' })
+  const [addCustomerSaving, setAddCustomerSaving] = useState(false)
+  const [addCustomerMsg, setAddCustomerMsg] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const importRef = useRef<HTMLInputElement>(null)
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [flows, setFlows] = useState<FlowSummary[]>([])
   const [flowsLoading, setFlowsLoading] = useState(false)
@@ -712,34 +725,194 @@ function MerchantDashboardInner() {
         )}
 
         {tab === 'customers' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
+          <div className="space-y-4">
+            {/* Header row */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <h2 className="text-2xl font-bold text-purple-400">Customers ({customers.length})</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => setAddCustomerOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">+ Add Customer</button>
+                <button onClick={() => importRef.current?.click()} disabled={importing} className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300 px-3 py-2 rounded-lg transition disabled:opacity-40">{importing ? 'Importing…' : '↑ Import CSV'}</button>
+                <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={async e => {
+                  const file = e.target.files?.[0]; if (!file) return
+                  setImporting(true); setImportMsg('')
+                  const text = await file.text()
+                  const r = await fetch('/api/merchant/customers/import', { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: text })
+                  const d = await r.json()
+                  setImportMsg(d.message || (r.ok ? 'Done' : d.error))
+                  setImporting(false); if (r.ok) loadCustomers()
+                  e.target.value = ''
+                }} />
+                <button onClick={() => {
+                  const filtered = customers.filter((c: any) => (tierFilter === 'All' || c.tier === tierFilter) && (!customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())))
+                  const headers = ['Name', 'Email', 'Phone', 'Birthday', 'Points', 'Lifetime Points', 'Tier', 'Joined']
+                  const rows = filtered.map((c: any) => [c.name || '', c.email || '', c.phone || '', c.birthday || '', c.points, c.lifetime_points || 0, c.tier, new Date(c.created_at).toLocaleDateString()])
+                  const csv = [headers, ...rows].map(r => r.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `customers-${new Date().toISOString().slice(0,10)}.csv`; a.click()
+                }} className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300 px-3 py-2 rounded-lg transition">↓ Export CSV</button>
+              </div>
+            </div>
+            {importMsg && <p className="text-sm text-green-400">{importMsg}</p>}
+
+            {/* Search + tier filter */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Search by name or email…" className="bg-[#16162a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50 w-64" />
               <div className="flex gap-1.5">
                 {(['All', 'Bronze', 'Silver', 'Gold'] as const).map(t => (
-                  <button key={t} onClick={() => setTierFilter(t)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${tierFilter === t
-                      ? t === 'Gold' ? 'bg-yellow-500 text-black' : t === 'Silver' ? 'bg-gray-400 text-black' : t === 'Bronze' ? 'bg-orange-500 text-black' : 'bg-purple-600 text-white'
-                      : 'bg-white/5 text-gray-400 hover:text-white'}`}>
-                    {t}
-                  </button>
+                  <button key={t} onClick={() => setTierFilter(t)} className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${tierFilter === t ? t === 'Gold' ? 'bg-yellow-500 text-black' : t === 'Silver' ? 'bg-gray-400 text-black' : t === 'Bronze' ? 'bg-orange-500 text-black' : 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:text-white'}`}>{t}</button>
                 ))}
               </div>
             </div>
-            {customers.length === 0 ? <p className="text-gray-500">No customers yet. They register through your Shopify widget.</p> : (
-              <table className="w-full text-sm">
-                <thead className="bg-[#1f1f3a]"><tr>{['Name','Email','Points','Tier','Joined'].map(h => <th key={h} className="px-4 py-3 text-left text-gray-400 font-medium">{h}</th>)}</tr></thead>
-                <tbody>{customers.filter((c: any) => tierFilter === 'All' || c.tier === tierFilter).map((c: any) => (
-                  <tr key={c.id} className="border-t border-white/5 hover:bg-white/5">
-                    <td className="px-4 py-3 font-medium">{c.name}</td>
-                    <td className="px-4 py-3 text-gray-400">{c.email}</td>
-                    <td className="px-4 py-3 text-purple-400 font-bold">{c.points}</td>
-                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${c.tier==='Gold'?'bg-yellow-900 text-yellow-400':c.tier==='Silver'?'bg-gray-700 text-gray-300':'bg-orange-900 text-orange-400'}`}>{c.tier}</span></td>
-                    <td className="px-4 py-3 text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+
+            {/* Table */}
+            {customers.length === 0 ? <p className="text-gray-500 text-sm">No customers yet.</p> : (() => {
+              const filtered = customers.filter((c: any) => (tierFilter === 'All' || c.tier === tierFilter) && (!customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())))
+              return filtered.length === 0 ? <p className="text-gray-500 text-sm">No customers match your search.</p> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
+                    <thead className="bg-[#1f1f3a]"><tr>{['Name','Email','Points','Tier','Joined',''].map(h => <th key={h} className="px-4 py-3 text-left text-gray-400 font-medium">{h}</th>)}</tr></thead>
+                    <tbody>{filtered.map((c: any) => (
+                      <tr key={c.id} className="border-t border-white/5 hover:bg-white/5 cursor-pointer" onClick={() => {
+                        setCustomerDetail(c)
+                        setCustomerDetailEdits({ name: c.name || '', phone: c.phone || '', birthday: c.birthday || '', pointsAdjust: '0' })
+                        setCustomerDetailLoading(true)
+                        fetch(`/api/merchant/customers?id=${c.id}`).then(r => r.json()).then(d => { setCustomerDetailHistory(d.history || []); setCustomerDetailLoading(false) })
+                      }}>
+                        <td className="px-4 py-3 font-medium">{c.name || <span className="text-gray-600">—</span>}</td>
+                        <td className="px-4 py-3 text-gray-400">{c.email}</td>
+                        <td className="px-4 py-3 text-purple-400 font-bold">{c.points.toLocaleString()}</td>
+                        <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${c.tier==='Gold'?'bg-yellow-900 text-yellow-400':c.tier==='Silver'?'bg-gray-700 text-gray-300':'bg-orange-900 text-orange-400'}`}>{c.tier}</span></td>
+                        <td className="px-4 py-3 text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">View →</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )
+            })()}
+
+            {/* Add Customer Modal */}
+            {addCustomerOpen && (
+              <>
+                <div className="fixed inset-0 bg-black/60 z-40" onClick={() => { setAddCustomerOpen(false); setAddCustomerMsg('') }} />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <div className="bg-[#16162a] border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-white">Add Customer</h3>
+                      <button onClick={() => { setAddCustomerOpen(false); setAddCustomerMsg('') }} className="text-gray-400 hover:text-white text-2xl leading-none">×</button>
+                    </div>
+                    <div className="space-y-3">
+                      <input placeholder="Name" value={addCustomerForm.name} onChange={e => setAddCustomerForm(p => ({...p, name: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50" />
+                      <input placeholder="Email *" value={addCustomerForm.email} onChange={e => setAddCustomerForm(p => ({...p, email: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50" />
+                      <input placeholder="Phone" value={addCustomerForm.phone} onChange={e => setAddCustomerForm(p => ({...p, phone: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50" />
+                      <div><label className="text-xs text-gray-400 mb-1 block">Birthday</label><input type="date" value={addCustomerForm.birthday} onChange={e => setAddCustomerForm(p => ({...p, birthday: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50" /></div>
+                      <div><label className="text-xs text-gray-400 mb-1 block">Starting points</label><input type="number" value={addCustomerForm.points} onChange={e => setAddCustomerForm(p => ({...p, points: e.target.value}))} className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500/50" /></div>
+                    </div>
+                    {addCustomerMsg && <p className={`text-sm ${addCustomerMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{addCustomerMsg}</p>}
+                    <button disabled={addCustomerSaving || !addCustomerForm.email} onClick={async () => {
+                      setAddCustomerSaving(true); setAddCustomerMsg('')
+                      const r = await fetch('/api/merchant/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...addCustomerForm, points: parseInt(addCustomerForm.points) || 0 }) })
+                      const d = await r.json()
+                      if (r.ok) { setAddCustomerMsg('✓ Customer added'); setAddCustomerForm({ name: '', email: '', phone: '', birthday: '', points: '0' }); loadCustomers() }
+                      else setAddCustomerMsg(d.error || 'Failed')
+                      setAddCustomerSaving(false)
+                    }} className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
+                      {addCustomerSaving ? 'Adding…' : 'Add Customer'}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
+
+            {/* Customer Detail Drawer */}
+            {customerDetail && (() => {
+              const c = customerDetail
+              const TX_LABELS: Record<string, string> = { earn_order: 'Order', earn_purchase: 'Order', earn_signup: 'Sign-up', earn_referral: 'Referral', earn_follow: 'Social follow', earn_birthday: 'Birthday', earn_flow: 'Flow reward', earn_adjustment: 'Adjustment', redeem: 'Redemption', deduct_cancel: 'Order cancelled', deduct_adjustment: 'Adjustment' }
+              return (
+                <>
+                  <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setCustomerDetail(null)} />
+                  <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#16162a] border-l border-white/10 z-50 flex flex-col shadow-2xl">
+                    <div className="px-6 pt-5 pb-4 border-b border-white/10 shrink-0">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-bold text-white text-lg">{c.name || c.email}</div>
+                          <div className="text-sm text-gray-400">{c.email}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.tier==='Gold'?'bg-yellow-900 text-yellow-400':c.tier==='Silver'?'bg-gray-700 text-gray-300':'bg-orange-900 text-orange-400'}`}>{c.tier}</span>
+                          <button onClick={() => setCustomerDetail(null)} className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                      {/* Points */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#0f0f1a] rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-purple-400">{c.points.toLocaleString()}</div>
+                          <div className="text-xs text-gray-500 mt-1">Current Points</div>
+                        </div>
+                        <div className="bg-[#0f0f1a] rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-gray-300">{(c.lifetime_points || 0).toLocaleString()}</div>
+                          <div className="text-xs text-gray-500 mt-1">Lifetime Points</div>
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div className="bg-[#0f0f1a] rounded-xl p-4 space-y-3">
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Info</div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div><label className="text-xs text-gray-500 block mb-1">Name</label><input value={customerDetailEdits.name} onChange={e => setCustomerDetailEdits(p => ({...p, name: e.target.value}))} className="w-full bg-[#16162a] border border-white/10 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-purple-500/50" /></div>
+                          <div><label className="text-xs text-gray-500 block mb-1">Phone</label><input value={customerDetailEdits.phone} onChange={e => setCustomerDetailEdits(p => ({...p, phone: e.target.value}))} className="w-full bg-[#16162a] border border-white/10 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-purple-500/50" /></div>
+                          <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Birthday</label><input type="date" value={customerDetailEdits.birthday} onChange={e => setCustomerDetailEdits(p => ({...p, birthday: e.target.value}))} className="w-full bg-[#16162a] border border-white/10 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-purple-500/50" /></div>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1"><label className="text-xs text-gray-500 block mb-1">Adjust Points</label><input type="number" value={customerDetailEdits.pointsAdjust} onChange={e => setCustomerDetailEdits(p => ({...p, pointsAdjust: e.target.value}))} placeholder="e.g. 50 or -50" className="w-full bg-[#16162a] border border-white/10 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-purple-500/50" /></div>
+                        </div>
+                        <button disabled={customerDetailSaving} onClick={async () => {
+                          setCustomerDetailSaving(true)
+                          const adj = parseInt(customerDetailEdits.pointsAdjust) || 0
+                          await fetch('/api/merchant/customers', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id, name: customerDetailEdits.name, phone: customerDetailEdits.phone, birthday: customerDetailEdits.birthday, points_adjust: adj }) })
+                          const updated = { ...c, name: customerDetailEdits.name, phone: customerDetailEdits.phone, birthday: customerDetailEdits.birthday, points: Math.max(0, c.points + adj) }
+                          setCustomerDetail(updated)
+                          setCustomerDetailEdits(p => ({...p, pointsAdjust: '0'}))
+                          setCustomers(prev => prev.map((x: any) => x.id === c.id ? updated : x))
+                          setCustomerDetailSaving(false)
+                          fetch(`/api/merchant/customers?id=${c.id}`).then(r => r.json()).then(d => setCustomerDetailHistory(d.history || []))
+                        }} className="w-full bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg transition">
+                          {customerDetailSaving ? 'Saving…' : 'Save Changes'}
+                        </button>
+                      </div>
+
+                      {/* Consent */}
+                      <div className="flex gap-3">
+                        <div className={`flex-1 rounded-xl p-3 text-center text-xs ${c.marketing_consent !== false ? 'bg-green-900/20 text-green-400' : 'bg-white/5 text-gray-500'}`}>✉️ Email {c.marketing_consent !== false ? 'Opted in' : 'Opted out'}</div>
+                        <div className={`flex-1 rounded-xl p-3 text-center text-xs ${c.whatsapp_consent !== false ? 'bg-green-900/20 text-green-400' : 'bg-white/5 text-gray-500'}`}>💬 WhatsApp {c.whatsapp_consent !== false ? 'Opted in' : 'Opted out'}</div>
+                      </div>
+
+                      {/* Transaction History */}
+                      <div>
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recent Activity</div>
+                        {customerDetailLoading ? <p className="text-sm text-gray-500">Loading…</p> : customerDetailHistory.length === 0 ? <p className="text-sm text-gray-600">No transactions yet.</p> : (
+                          <div className="space-y-2">
+                            {customerDetailHistory.map((tx: any, i: number) => (
+                              <div key={i} className="flex items-center justify-between text-sm">
+                                <div>
+                                  <span className="text-gray-300">{TX_LABELS[tx.type] || tx.type}</span>
+                                  {tx.description && <span className="text-gray-600 text-xs ml-2">{tx.description}</span>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={tx.points > 0 ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>{tx.points > 0 ? '+' : ''}{tx.points} pts</span>
+                                  <span className="text-gray-600 text-xs">{new Date(tx.created_at).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
           </div>
         )}
 
