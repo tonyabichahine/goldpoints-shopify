@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
 interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number; error_enrollments: number }
@@ -947,6 +947,15 @@ function MerchantDashboardInner() {
                 <p className="text-sm text-gray-400 mb-1">Logged in as</p>
                 <p className="font-semibold">{merchant.email}</p>
               </div>
+              {(merchant.whatsapp_credits ?? 0) > 0 && (
+                <div className="bg-[#16162a] border border-green-500/20 rounded-xl p-6 mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">💬 WhatsApp Credits</p>
+                    <p className="text-2xl font-bold text-green-400">{merchant.whatsapp_credits}</p>
+                  </div>
+                  <p className="text-xs text-gray-500 max-w-[180px] text-right">Credits are deducted each time a WhatsApp message is sent through a flow</p>
+                </div>
+              )}
               <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 max-w-md">
                 <h4 className="font-semibold mb-4">Change Password</h4>
                 <div className="space-y-3">

@@ -290,7 +290,10 @@
         <input class="gp-input" value="${esc(CUSTOMER_EMAIL)}" type="email" disabled />
         <label class="gp-field-label">Date of birth <span style="opacity:.5;font-size:.72rem">(optional)</span></label>
         <input class="gp-input" id="gp-profile-birthday" type="date" />
+        <label class="gp-field-label">Phone number <span style="opacity:.5;font-size:.72rem">(optional, include country code)</span></label>
+        <input class="gp-input" id="gp-profile-phone" type="tel" placeholder="+1 555 000 0000" />
         <label class="gp-consent"><input type="checkbox" id="gp-marketing-consent" /> I would like to receive promotions by email <span style="opacity:.5">(optional)</span></label>
+        <label class="gp-consent"><input type="checkbox" id="gp-whatsapp-consent" /> Send me updates on WhatsApp <span style="opacity:.5">(optional)</span></label>
         <button class="gp-btn-main" id="gp-profile-save" style="background:${c}">Save & Start Earning</button>
         <p id="gp-profile-msg" class="gp-msg"></p>
       </div>
@@ -314,6 +317,9 @@
         <input class="gp-input" id="gp-reg-email" type="email" placeholder="your@email.com" />
         <label class="gp-field-label">Password *</label>
         <input class="gp-input" id="gp-reg-password" type="password" placeholder="Create a password" />
+        <label class="gp-field-label">Phone number <span style="opacity:.5;font-size:.72rem">(optional, include country code)</span></label>
+        <input class="gp-input" id="gp-reg-phone" type="tel" placeholder="+1 555 000 0000" />
+        <label class="gp-consent"><input type="checkbox" id="gp-reg-whatsapp" /> Send me updates on WhatsApp <span style="opacity:.5">(optional)</span></label>
         <button class="gp-btn-main" id="gp-reg-submit" style="background:${c}">Create Account</button>
         <p id="gp-reg-msg" class="gp-msg"></p>
       </div>
@@ -481,7 +487,10 @@
           <div style="padding-top:4px">
             <label class="gp-field-label">Date of birth</label>
             <input class="gp-input" id="gp-edit-birthday" type="date" value="${esc(customer.birthday||'')}" />
+            <label class="gp-field-label">Phone number <span style="opacity:.5;font-size:.72rem">(include country code)</span></label>
+            <input class="gp-input" id="gp-edit-phone" type="tel" placeholder="+1 555 000 0000" value="${esc(customer.phone||'')}" />
             <label class="gp-consent"><input type="checkbox" id="gp-edit-consent" ${customer.marketing_consent?'checked':''} /> I would like to receive promotions by email</label>
+            <label class="gp-consent"><input type="checkbox" id="gp-edit-whatsapp" ${customer.whatsapp_consent?'checked':''} /> Send me updates on WhatsApp</label>
             <button class="gp-btn-main" id="gp-edit-save" style="background:${c}">Save Changes</button>
             <p id="gp-edit-msg" class="gp-msg"></p>
             <button class="gp-logout" id="gp-logout-btn">Sign out</button>
@@ -535,9 +544,11 @@
         const name = CUSTOMER_NAME || document.getElementById('gp-profile-name').value.trim()
         const birthday = document.getElementById('gp-profile-birthday').value
         const marketing_consent = document.getElementById('gp-marketing-consent').checked
+        const whatsapp_consent = document.getElementById('gp-whatsapp-consent').checked
+        const phone = document.getElementById('gp-profile-phone').value.trim()
         const msg = document.getElementById('gp-profile-msg')
         msg.textContent='Saving...'; msg.style.color='#7878a0'
-        const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email:CUSTOMER_EMAIL,name,birthday,marketing_consent,gp_ref:GP_REF})})
+        const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email:CUSTOMER_EMAIL,name,birthday,marketing_consent,whatsapp_consent,phone,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
         localStorage.setItem(STORAGE_KEY,CUSTOMER_EMAIL); localStorage.removeItem(REF_STORAGE_KEY); customer=data.customer; render('home')
       })
@@ -564,10 +575,12 @@
         const name = document.getElementById('gp-reg-name').value.trim()
         const email = document.getElementById('gp-reg-email').value.trim()
         const password = document.getElementById('gp-reg-password').value
+        const phone = document.getElementById('gp-reg-phone').value.trim()
+        const whatsapp_consent = document.getElementById('gp-reg-whatsapp').checked
         const msg = document.getElementById('gp-reg-msg')
         if (!name || !email || !password) { msg.textContent='All fields are required.'; msg.style.color='#e74c3c'; return }
         msg.textContent='Creating account...'; msg.style.color='#7878a0'
-        const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name,password,gp_ref:GP_REF})})
+        const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name,password,phone,whatsapp_consent,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
         localStorage.setItem(STORAGE_KEY,email); localStorage.removeItem(REF_STORAGE_KEY); customer=data.customer; render('home')
       })
@@ -653,10 +666,12 @@
         editSave.addEventListener('click', async () => {
           const birthday = document.getElementById('gp-edit-birthday').value
           const marketing_consent = document.getElementById('gp-edit-consent').checked
+          const whatsapp_consent = document.getElementById('gp-edit-whatsapp').checked
+          const phone = document.getElementById('gp-edit-phone').value.trim()
           const msg = document.getElementById('gp-edit-msg')
           msg.textContent='Saving...'; msg.style.color='#7878a0'
           const email = (customer&&customer.email)||CUSTOMER_EMAIL||localStorage.getItem(STORAGE_KEY)
-          const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name:customer.name,birthday,marketing_consent})})
+          const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name:customer.name,birthday,marketing_consent,whatsapp_consent,phone})})
           if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
           customer=data.customer; msg.textContent='Saved!'; msg.style.color='#2ecc71'
         })

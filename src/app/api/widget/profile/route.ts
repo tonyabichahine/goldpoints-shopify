@@ -15,7 +15,7 @@ function genCode() {
 }
 
 export async function POST(req: NextRequest) {
-  const { shop, email, name, birthday, marketing_consent, gp_ref, password } = await req.json()
+  const { shop, email, name, birthday, marketing_consent, whatsapp_consent, phone, gp_ref, password } = await req.json()
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
     .from('customers').select('*').eq('merchant_id', merchant.id).eq('email', email.toLowerCase().trim()).single()
 
   if (existing) {
-    const updates: Record<string, unknown> = { birthday: birthday || null, marketing_consent: !!marketing_consent, name: name || existing.name }
+    const updates: Record<string, unknown> = { birthday: birthday || null, marketing_consent: !!marketing_consent, name: name || existing.name, whatsapp_consent: !!whatsapp_consent }
+    if (phone) updates.phone = phone
     if (!existing.referral_code) updates.referral_code = genCode()
     if (password && !existing.password_hash) updates.password_hash = await bcrypt.hash(password, 10)
     const { data: updated } = await supabaseAdmin.from('customers').update(updates).eq('id', existing.id).select().single()
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   const initialTier = getTier(bonus, merchant.tier_silver ?? 500, merchant.tier_gold ?? 1000)
   const { data: customer, error } = await supabaseAdmin
     .from('customers')
-    .insert({ merchant_id: merchant.id, email: email.toLowerCase().trim(), name: name || email, birthday: birthday || null, marketing_consent: !!marketing_consent, password_hash, points: bonus, lifetime_points: bonus, tier: initialTier, referral_code, referred_by })
+    .insert({ merchant_id: merchant.id, email: email.toLowerCase().trim(), name: name || email, birthday: birthday || null, marketing_consent: !!marketing_consent, whatsapp_consent: !!whatsapp_consent, phone: phone || null, password_hash, points: bonus, lifetime_points: bonus, tier: initialTier, referral_code, referred_by })
     .select().single()
 
   if (error) return NextResponse.json({ error: 'Failed to save profile' }, { status: 500, headers: cors })

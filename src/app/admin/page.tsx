@@ -18,6 +18,7 @@ interface Merchant {
   custom_from_email: string | null
   resend_domain_id: string | null
   custom_domain_status: string | null
+  whatsapp_credits: number
 }
 
 interface DnsRecord {
@@ -61,6 +62,8 @@ export default function AdminPage() {
   const [domainStatus, setDomainStatus] = useState('')
   const [domainLoading, setDomainLoading] = useState(false)
   const [domainMsg, setDomainMsg] = useState('')
+  const [addCredits, setAddCredits] = useState('')
+  const [creditsMsg, setCreditsMsg] = useState('')
 
   useEffect(() => { load(); loadCronStatus(); loadEnrollmentStats() }, [])
 
@@ -480,6 +483,35 @@ export default function AdminPage() {
                   <p className="text-xs text-gray-500 mt-2">Add these in your domain registrar (Cloudflare, Namecheap, GoDaddy, etc.), then click Check Verification above.</p>
                 </div>
               )}
+
+              {/* WhatsApp Credits */}
+              <div className="border-t border-white/10 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-white">💬 WhatsApp Credits</div>
+                  <div className="text-lg font-bold text-green-400">{settingsMerchant.whatsapp_credits ?? 0}</div>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number" min={1} placeholder="Credits to add" value={addCredits}
+                    onChange={e => setAddCredits(e.target.value)}
+                    className="flex-1 bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500"
+                  />
+                  <button
+                    onClick={async () => {
+                      const n = parseInt(addCredits)
+                      if (!n || n <= 0) return
+                      await fetch('/api/admin/merchants', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: settingsMerchant.id, add_whatsapp_credits: n }) })
+                      setSettingsMerchant(m => m ? { ...m, whatsapp_credits: (m.whatsapp_credits || 0) + n } : m)
+                      setAddCredits('')
+                      setCreditsMsg(`+${n} credits added`)
+                      setTimeout(() => setCreditsMsg(''), 3000)
+                      load()
+                    }}
+                    className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                  >Add</button>
+                </div>
+                {creditsMsg && <p className="text-xs text-green-400">{creditsMsg}</p>}
+              </div>
             </div>
           </div>
         </div>

@@ -102,6 +102,18 @@ function AddPointsNode({ data, selected }: NodeProps) {
   )
 }
 
+function WhatsAppNode({ data, selected }: NodeProps) {
+  return (
+    <div className={`rounded-xl px-4 py-3 min-w-[200px] border-2 ${selected ? 'border-green-400' : 'border-green-600/50'}`}
+      style={{ background: '#16162a' }}>
+      <Handle type="target" position={Position.Top} className="!bg-green-400 !w-3 !h-3" />
+      <div className="text-[10px] uppercase tracking-widest text-green-400 mb-1">💬 WhatsApp</div>
+      <div className="font-semibold text-sm text-white truncate">{(data.body as string) ? String(data.body).substring(0, 40) + '…' : 'No message'}</div>
+      <Handle type="source" position={Position.Bottom} className="!bg-green-400 !w-3 !h-3" />
+    </div>
+  )
+}
+
 function EndNode({ data: _d, selected }: NodeProps) {
   return (
     <div className={`rounded-xl px-4 py-3 min-w-[120px] border-2 ${selected ? 'border-gray-400' : 'border-gray-600/50'}`}
@@ -113,7 +125,7 @@ function EndNode({ data: _d, selected }: NodeProps) {
   )
 }
 
-const nodeTypes = { trigger: TriggerNode, email: EmailNode, wait: WaitNode, condition: ConditionNode, addPoints: AddPointsNode, end: EndNode }
+const nodeTypes = { trigger: TriggerNode, email: EmailNode, whatsapp: WhatsAppNode, wait: WaitNode, condition: ConditionNode, addPoints: AddPointsNode, end: EndNode }
 
 // ─── Email Preview ────────────────────────────────────────────────────────────
 
@@ -228,6 +240,22 @@ function ConfigPanel({ node, onChange, onClose, onDelete, merchantEmail }: {
                 className="w-full border border-purple-500/40 hover:border-purple-500 bg-purple-900/20 hover:bg-purple-900/30 text-purple-300 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-40">
                 {testSending ? 'Sending…' : testMsg || '✉ Send Test Email'}
               </button>
+            </div>
+          </>
+        )}
+
+        {node.type === 'whatsapp' && (
+          <>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Message</label>
+              <p className="text-[10px] text-gray-600 mb-1">{'{{name}} {{points}} {{tier}} {{store}}'}</p>
+              <textarea value={(d.body as string) || ''} onChange={e => setD(p => ({ ...p, body: e.target.value }))}
+                rows={6} placeholder={'Hi {{name}}, you have {{points}} points at {{store}}! 🎉'}
+                className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500 resize-none" />
+            </div>
+            <div className="bg-[#0f0f1a] rounded-lg p-3 text-xs text-gray-500 space-y-1">
+              <div>Only sends to customers who opted in to WhatsApp</div>
+              <div>Requires merchant WhatsApp credits</div>
             </div>
           </>
         )}
@@ -381,6 +409,7 @@ function validateFlow(nodes: Node[], edges: Edge[]): string[] {
 
 const ACTIONS = [
   { type: 'email',     label: 'Email',      icon: '✉',  desc: 'Send an email' },
+  { type: 'whatsapp',  label: 'WhatsApp',   icon: '💬', desc: 'Send a WhatsApp message' },
   { type: 'wait',      label: 'Wait',       icon: '⏳', desc: 'Delay before next step' },
   { type: 'condition', label: 'Condition',  icon: '?',  desc: 'Branch on customer data' },
   { type: 'addPoints', label: 'Add Points', icon: '⭐', desc: 'Award bonus points' },

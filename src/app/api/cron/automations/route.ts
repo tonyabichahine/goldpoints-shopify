@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendEmail, sendFlowEmail, buildCampaignEmailPayload } from '@/lib/email'
+import { sendWhatsApp } from '@/lib/whatsapp'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -42,8 +43,8 @@ async function processEnrollment(enrollment: any) {
   try {
     const [flowRes, customerRes, merchantRes] = await Promise.all([
       supabaseAdmin.from('automation_flows').select('nodes, edges').eq('id', enrollment.flow_id).single(),
-      supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points, marketing_consent').eq('id', enrollment.customer_id).single(),
-      supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email').eq('id', enrollment.merchant_id).single(),
+      supabaseAdmin.from('customers').select('id, email, name, points, tier, lifetime_points, marketing_consent, whatsapp_consent, phone').eq('id', enrollment.customer_id).single(),
+      supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email, whatsapp_credits').eq('id', enrollment.merchant_id).single(),
     ])
 
     if (!flowRes.data || !customerRes.data) {
@@ -58,6 +59,7 @@ async function processEnrollment(enrollment: any) {
     const shopifyDomain = merchantRes.data?.shopify_domain || ''
     const merchantEmail = merchantRes.data?.email || ''
     const customFromEmail = merchantRes.data?.is_premium && merchantRes.data?.custom_from_email ? merchantRes.data.custom_from_email : undefined
+    let whatsappCredits: number = merchantRes.data?.whatsapp_credits || 0
 
     const sub = (s: string) => (s || '')
       .replace(/\{\{name\}\}/g, (customer.name || customer.email).split(' ')[0])
@@ -88,6 +90,18 @@ async function processEnrollment(enrollment: any) {
             .update({ last_email_sent_at: new Date().toISOString() })
             .eq('id', enrollment.id)
           enrollment.last_email_sent_at = new Date().toISOString()
+        }
+      } else if (node.type === 'whatsapp') {
+        currentNodeId = getNextNodeId(node.id, edges)
+        await supabaseAdmin.from('automation_enrollments')
+          .update({ current_node_id: currentNodeId, error_count: 0 })
+          .eq('id', enrollment.id)
+        if (customer.whatsapp_consent !== false && customer.phone && whatsappCredits > 0) {
+          await sendWhatsApp(customer.phone, sub(node.data.body || ''))
+          await supabaseAdmin.from('merchants')
+            .update({ whatsapp_credits: Math.max(0, whatsappCredits - 1) })
+            .eq('id', enrollment.merchant_id)
+          whatsappCredits--
         }
       } else if (node.type === 'wait') {
         const ms = (node.data.unit === 'hours' ? 3600000 : 86400000) * (node.data.amount || 1)
