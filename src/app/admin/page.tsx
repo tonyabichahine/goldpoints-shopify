@@ -20,6 +20,7 @@ interface Merchant {
   custom_domain_status: string | null
   whatsapp_credits: number
   whatsapp_phone_number_id: string | null
+  whatsapp_waba_id: string | null
 }
 
 interface DnsRecord {
@@ -66,6 +67,7 @@ export default function AdminPage() {
   const [addCredits, setAddCredits] = useState('')
   const [creditsMsg, setCreditsMsg] = useState('')
   const [waPhoneId, setWaPhoneId] = useState('')
+  const [waWabaId, setWaWabaId] = useState('')
   const [waToken, setWaToken] = useState('')
   const [waSaving, setWaSaving] = useState(false)
   const [waMsg, setWaMsg] = useState('')
@@ -538,6 +540,16 @@ export default function AdminPage() {
                 />
               </div>
               <div>
+                <label className="block text-xs text-gray-400 mb-1">WhatsApp Business Account ID (WABA ID)</label>
+                <input
+                  value={waWabaId}
+                  onChange={e => setWaWabaId(e.target.value)}
+                  placeholder={settingsMerchant.whatsapp_waba_id ? '(already set — paste to replace)' : '9876543210'}
+                  className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500"
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Found in Meta Business → WhatsApp → Accounts</p>
+              </div>
+              <div>
                 <label className="block text-xs text-gray-400 mb-1">Access Token</label>
                 <input
                   type="password"
@@ -549,17 +561,19 @@ export default function AdminPage() {
               </div>
               {waMsg && <p className={`text-xs ${waMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{waMsg}</p>}
               <button
-                disabled={waSaving || (!waPhoneId && !waToken)}
+                disabled={waSaving || (!waPhoneId && !waWabaId && !waToken)}
                 onClick={async () => {
                   setWaSaving(true); setWaMsg('')
                   const body: Record<string, string> = { id: settingsMerchant.id }
                   if (waPhoneId) body.whatsapp_phone_number_id = waPhoneId
+                  if (waWabaId) body.whatsapp_waba_id = waWabaId
                   if (waToken) body.whatsapp_token = waToken
                   const r = await fetch('/api/admin/merchants', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
                   setWaSaving(false)
                   if (r.ok) {
                     if (waPhoneId) setSettingsMerchant(m => m ? { ...m, whatsapp_phone_number_id: waPhoneId } : m)
-                    setWaPhoneId(''); setWaToken('')
+                    if (waWabaId) setSettingsMerchant(m => m ? { ...m, whatsapp_waba_id: waWabaId } : m)
+                    setWaPhoneId(''); setWaWabaId(''); setWaToken('')
                     setWaMsg('✓ Credentials saved')
                     setTimeout(() => setWaMsg(''), 3000)
                   } else { setWaMsg('Save failed') }

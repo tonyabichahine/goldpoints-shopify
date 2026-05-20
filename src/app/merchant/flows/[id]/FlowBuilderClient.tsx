@@ -102,23 +102,15 @@ function AddPointsNode({ data, selected }: NodeProps) {
   )
 }
 
-const WHATSAPP_TEMPLATES = [
-  { name: 'goldpoints_welcome',      label: 'Welcome Message',  preview: 'Hi [Name], welcome to [Store]! You\'ve earned [Points] bonus points just for joining. 🎉 Keep shopping to earn more!', desc: 'Best for: signup trigger' },
-  { name: 'goldpoints_birthday',     label: 'Birthday Greeting', preview: '🎂 Happy Birthday [Name]! As a special gift from [Store], you\'ve received [Points] bonus points. Enjoy your day!', desc: 'Best for: birthday trigger' },
-  { name: 'goldpoints_points_earned', label: 'Points Update',   preview: 'Hi [Name], great news! You\'ve earned points at [Store] and now have [Points] points total. Keep it up! ⭐', desc: 'Best for: any action trigger' },
-  { name: 'goldpoints_reward_ready', label: 'Reward Available', preview: 'Hi [Name], you\'ve reached [Points] points at [Store] — enough to redeem a reward! Visit the store to claim it. 🎁', desc: 'Best for: points milestone trigger' },
-  { name: 'goldpoints_win_back',     label: 'Win-Back',         preview: 'Hey [Name], we miss you at [Store]! You still have [Points] points waiting. Come back and treat yourself! 💛', desc: 'Best for: inactivity triggers' },
-]
-const WA_TEMPLATE_MAP = Object.fromEntries(WHATSAPP_TEMPLATES.map(t => [t.name, t]))
 
 function WhatsAppNode({ data, selected }: NodeProps) {
-  const tpl = WA_TEMPLATE_MAP[(data.templateName as string) || '']
+  const name = (data.templateName as string) || ''
   return (
     <div className={`rounded-xl px-4 py-3 min-w-[200px] border-2 ${selected ? 'border-green-400' : 'border-green-600/50'}`}
       style={{ background: '#16162a' }}>
       <Handle type="target" position={Position.Top} className="!bg-green-400 !w-3 !h-3" />
       <div className="text-[10px] uppercase tracking-widest text-green-400 mb-1">💬 WhatsApp</div>
-      <div className="font-semibold text-sm text-white truncate">{tpl ? tpl.label : 'Select template'}</div>
+      <div className="font-semibold text-sm text-white truncate font-mono">{name || 'Select template'}</div>
       <Handle type="source" position={Position.Bottom} className="!bg-green-400 !w-3 !h-3" />
     </div>
   )
@@ -164,9 +156,10 @@ const WAIT_PRESETS = [
   { label: '1w', amount: 7, unit: 'days' },
 ]
 
-function ConfigPanel({ node, onChange, onClose, onDelete, merchantEmail }: {
+function ConfigPanel({ node, onChange, onClose, onDelete, merchantEmail, waTemplates }: {
   node: Node; onChange: (id: string, data: Record<string, unknown>) => void
   onClose: () => void; onDelete: () => void; merchantEmail: string
+  waTemplates: { name: string; body: string }[]
 }) {
   const [d, setD] = useState<Record<string, unknown>>({ ...node.data as Record<string, unknown> })
   const [showPreview, setShowPreview] = useState(false)
@@ -256,29 +249,38 @@ function ConfigPanel({ node, onChange, onClose, onDelete, merchantEmail }: {
 
         {node.type === 'whatsapp' && (
           <>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Template</label>
-              <select value={(d.templateName as string) || 'goldpoints_points_earned'}
-                onChange={e => setD(p => ({ ...p, templateName: e.target.value }))}
-                className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500">
-                {WHATSAPP_TEMPLATES.map(t => <option key={t.name} value={t.name}>{t.label}</option>)}
-              </select>
-            </div>
-            {(() => {
-              const tpl = WA_TEMPLATE_MAP[(d.templateName as string) || 'goldpoints_points_earned']
-              return tpl ? (
-                <div className="bg-[#0f0f1a] rounded-lg p-3 space-y-2">
-                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">Preview</div>
-                  <div className="text-xs text-gray-300 leading-relaxed">{tpl.preview}</div>
-                  <div className="text-[10px] text-green-500">{tpl.desc}</div>
-                  <div className="text-[10px] text-gray-600">[Name] [Store] [Points] filled automatically at send time</div>
+            {waTemplates.length === 0 ? (
+              <div className="bg-[#0f0f1a] rounded-lg p-4 text-xs text-gray-500 text-center space-y-1">
+                <div className="text-2xl mb-2">💬</div>
+                <div>No approved templates yet.</div>
+                <div>Go to the <span className="text-green-400">WhatsApp</span> tab to create and submit templates to Meta for approval.</div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Template</label>
+                  <select value={(d.templateName as string) || ''}
+                    onChange={e => setD(p => ({ ...p, templateName: e.target.value }))}
+                    className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500">
+                    <option value="">Select a template…</option>
+                    {waTemplates.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                  </select>
                 </div>
-              ) : null
-            })()}
+                {(() => {
+                  const tpl = waTemplates.find(t => t.name === (d.templateName as string))
+                  return tpl ? (
+                    <div className="bg-[#0f0f1a] rounded-lg p-3 space-y-1.5">
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest">Message preview</div>
+                      <div className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">{tpl.body}</div>
+                      <div className="text-[10px] text-gray-600 pt-1">{'{{1}}'} = name · {'{{2}}'} = store · {'{{3}}'} = points · {'{{4}}'} = tier</div>
+                    </div>
+                  ) : null
+                })()}
+              </>
+            )}
             <div className="bg-[#0f0f1a] rounded-lg p-3 text-xs text-gray-500 space-y-1">
               <div>Only sends to customers who opted in to WhatsApp</div>
               <div>Requires merchant WhatsApp credits</div>
-              <div>Uses Meta-approved message templates</div>
             </div>
           </>
         )}
@@ -457,6 +459,7 @@ function FlowBuilder() {
 
   const [flowName, setFlowName] = useState('Untitled Flow')
   const [merchantEmail, setMerchantEmail] = useState('')
+  const [waTemplates, setWaTemplates] = useState<{ name: string; body: string }[]>([])
   const [active, setActive] = useState(false)
   const [allowReenroll, setAllowReenroll] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -471,6 +474,7 @@ function FlowBuilder() {
 
   useEffect(() => {
     fetch('/api/merchant/me').then(r => { if (r.status === 401) router.push('/'); return r.ok ? r.json() : null }).then(d => { if (d?.email) setMerchantEmail(d.email) })
+    fetch('/api/merchant/whatsapp-templates').then(r => r.ok ? r.json() : []).then((ts: any[]) => setWaTemplates(ts.filter((t: any) => t.status === 'APPROVED').map((t: any) => ({ name: t.name, body: t.body }))))
     if (flowId !== 'new') {
       fetch(`/api/merchant/flows?id=${flowId}`)
         .then(r => r.ok ? r.json() : null)
@@ -672,6 +676,7 @@ function FlowBuilder() {
             onClose={() => setSelectedNode(null)}
             onDelete={() => deleteNode(selectedNode.id)}
             merchantEmail={merchantEmail}
+            waTemplates={waTemplates}
           />
         )}
         {showAnalytics && flowId !== 'new' && (

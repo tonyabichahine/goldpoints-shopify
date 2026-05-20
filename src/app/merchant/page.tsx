@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
+interface WaTemplate { id: string; name: string; category: string; body: string; status: string; rejection_reason: string | null; created_at: string }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
 interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number; error_enrollments: number }
@@ -110,9 +111,9 @@ function MerchantDashboardInner() {
   const searchParams = useSearchParams()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings' | 'campaigns' | 'flows'>(() => {
+  const [tab, setTab] = useState<'overview' | 'customers' | 'offers' | 'settings' | 'campaigns' | 'flows' | 'whatsapp'>(() => {
     const t = searchParams.get('tab')
-    if (t === 'flows' || t === 'campaigns' || t === 'offers' || t === 'customers' || t === 'settings') return t
+    if (t === 'flows' || t === 'campaigns' || t === 'offers' || t === 'customers' || t === 'settings' || t === 'whatsapp') return t
     return 'overview'
   })
   const [customers, setCustomers] = useState<any[]>([])
@@ -125,6 +126,12 @@ function MerchantDashboardInner() {
   const [newPw, setNewPw] = useState('')
   const [pwMsg, setPwMsg] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
+  const [waTemplates, setWaTemplates] = useState<WaTemplate[]>([])
+  const [waLoading, setWaLoading] = useState(false)
+  const [waSyncing, setWaSyncing] = useState(false)
+  const [waForm, setWaForm] = useState({ name: '', category: 'MARKETING', body: '' })
+  const [waSubmitting, setWaSubmitting] = useState(false)
+  const [waMsg, setWaMsg] = useState('')
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [drawer, setDrawer] = useState<{ type: string | null; data: any[]; loading: boolean; period: string }>({ type: null, data: [], loading: false, period: '30' })
@@ -156,6 +163,7 @@ function MerchantDashboardInner() {
     if (tab === 'overview') { loadAnalytics(); loadCampaigns(); loadFlows() }
     if (tab === 'campaigns') { loadCampaigns() }
     if (tab === 'flows') loadFlows()
+    if (tab === 'whatsapp') loadWaTemplates()
   }, [tab])
 
   useEffect(() => {
@@ -165,6 +173,13 @@ function MerchantDashboardInner() {
       .then(d => { if (d?.analytics) setFlowAnalytics(d.analytics) })
       .catch(() => {})
   }, [flowDetail?.id])
+
+  async function loadWaTemplates() {
+    setWaLoading(true)
+    const r = await fetch('/api/merchant/whatsapp-templates')
+    if (r.ok) setWaTemplates(await r.json())
+    setWaLoading(false)
+  }
 
   async function loadCustomers() {
     const r = await fetch('/api/merchant/customers')
@@ -350,6 +365,11 @@ function MerchantDashboardInner() {
           {(['overview','customers','offers','campaigns','flows','settings'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
           ))}
+          {merchant?.is_premium && (
+            <button onClick={() => setTab('whatsapp')} className={`px-4 py-2 rounded-full text-sm transition flex items-center gap-1.5 ${tab === 'whatsapp' ? 'bg-green-700 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>
+              💬 WhatsApp
+            </button>
+          )}
         </div>
         <button onClick={() => setAiChat(p => ({ ...p, open: true }))} className="flex items-center gap-1.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-full text-sm font-semibold transition shrink-0 ml-4">
           <span>✦</span> AI
@@ -821,6 +841,140 @@ function MerchantDashboardInner() {
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {tab === 'whatsapp' && merchant && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-green-400">💬 WhatsApp Templates</h2>
+              <button
+                disabled={waSyncing || !merchant.whatsapp_waba_id}
+                onClick={async () => {
+                  setWaSyncing(true)
+                  await fetch('/api/merchant/whatsapp-templates', { method: 'PATCH' })
+                  await loadWaTemplates()
+                  setWaSyncing(false)
+                }}
+                className="text-xs border border-white/10 hover:border-white/25 px-3 py-1.5 rounded-lg text-gray-400 hover:text-white transition disabled:opacity-40"
+              >
+                {waSyncing ? 'Syncing…' : '↻ Sync Status'}
+              </button>
+            </div>
+
+            {!merchant.whatsapp_waba_id && (
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 text-center">
+                <div className="text-3xl mb-3">💬</div>
+                <div className="text-white font-semibold mb-1">WhatsApp not configured yet</div>
+                <div className="text-sm text-gray-500">Contact us to get your WhatsApp Business account connected. Once set up, you can create and submit templates here.</div>
+              </div>
+            )}
+
+            {merchant.whatsapp_waba_id && (
+              <>
+                {/* Existing templates */}
+                {waLoading ? (
+                  <p className="text-sm text-gray-500">Loading templates…</p>
+                ) : waTemplates.length === 0 ? (
+                  <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 text-center text-gray-500 text-sm">No templates yet. Create one below.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {waTemplates.map(t => {
+                      const statusColor: Record<string, string> = {
+                        APPROVED: 'bg-green-900/40 text-green-400',
+                        PENDING: 'bg-yellow-900/40 text-yellow-400',
+                        REJECTED: 'bg-red-900/40 text-red-400',
+                        draft: 'bg-gray-800 text-gray-500',
+                        error: 'bg-red-900/40 text-red-400',
+                      }
+                      return (
+                        <div key={t.id} className="bg-[#16162a] border border-white/10 rounded-xl p-4 flex items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-mono text-sm text-white font-semibold">{t.name}</span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">{t.category}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusColor[t.status] || 'bg-gray-800 text-gray-500'}`}>{t.status}</span>
+                            </div>
+                            <p className="text-sm text-gray-300 whitespace-pre-wrap line-clamp-3">{t.body}</p>
+                            {t.rejection_reason && <p className="text-xs text-red-400 mt-1">Rejected: {t.rejection_reason}</p>}
+                          </div>
+                          <button
+                            onClick={async () => {
+                              await fetch(`/api/merchant/whatsapp-templates?id=${t.id}`, { method: 'DELETE' })
+                              setWaTemplates(prev => prev.filter(x => x.id !== t.id))
+                            }}
+                            className="text-xs text-red-500 hover:text-red-400 shrink-0 transition"
+                          >Delete</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Create new template */}
+                <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
+                  <h3 className="text-base font-semibold text-white">Create New Template</h3>
+                  <div className="bg-[#0f0f1a] rounded-lg p-3 text-xs text-gray-500 space-y-1">
+                    <div>Variables: <span className="text-purple-400 font-mono">{'{{1}}'}</span> = customer name · <span className="text-purple-400 font-mono">{'{{2}}'}</span> = store name · <span className="text-purple-400 font-mono">{'{{3}}'}</span> = points · <span className="text-purple-400 font-mono">{'{{4}}'}</span> = tier</div>
+                    <div>Template name must be lowercase with underscores only, e.g. <span className="text-gray-300 font-mono">my_store_welcome</span></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Template Name</label>
+                      <input
+                        value={waForm.name}
+                        onChange={e => setWaForm(p => ({ ...p, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
+                        placeholder="my_loyalty_welcome"
+                        className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Category</label>
+                      <select
+                        value={waForm.category}
+                        onChange={e => setWaForm(p => ({ ...p, category: e.target.value }))}
+                        className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500"
+                      >
+                        <option value="MARKETING">Marketing</option>
+                        <option value="UTILITY">Utility</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Message Body</label>
+                    <textarea
+                      value={waForm.body}
+                      onChange={e => setWaForm(p => ({ ...p, body: e.target.value }))}
+                      rows={5}
+                      placeholder={'Hi {{1}}, you have {{3}} points at {{2}}! 🎉'}
+                      className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-500 resize-none"
+                    />
+                  </div>
+                  {waMsg && <p className={`text-xs ${waMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{waMsg}</p>}
+                  <button
+                    disabled={waSubmitting || !waForm.name || !waForm.body}
+                    onClick={async () => {
+                      setWaSubmitting(true); setWaMsg('')
+                      const r = await fetch('/api/merchant/whatsapp-templates', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(waForm),
+                      })
+                      const d = await r.json()
+                      setWaSubmitting(false)
+                      if (r.ok || r.status === 422) {
+                        setWaTemplates(prev => [d, ...prev])
+                        setWaForm({ name: '', category: 'MARKETING', body: '' })
+                        setWaMsg(d.status === 'PENDING' ? '✓ Submitted to Meta for review!' : d.status === 'error' ? `Meta error: ${d.meta_error}` : '✓ Saved as draft (WhatsApp not yet configured)')
+                        setTimeout(() => setWaMsg(''), 5000)
+                      } else { setWaMsg(d.error || 'Failed to create template') }
+                    }}
+                    className="bg-green-700 hover:bg-green-600 disabled:opacity-40 px-5 py-2 rounded-lg font-semibold text-sm transition"
+                  >
+                    {waSubmitting ? 'Submitting…' : 'Submit to Meta for Approval'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
