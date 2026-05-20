@@ -436,11 +436,9 @@ function MerchantDashboardInner() {
           {(['overview','customers','offers','campaigns','flows','settings'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
           ))}
-          {merchant?.is_premium && (
-            <button onClick={() => setTab('whatsapp')} className={`px-4 py-2 rounded-full text-sm transition flex items-center gap-1.5 ${tab === 'whatsapp' ? 'bg-green-700 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>
-              💬 WhatsApp
-            </button>
-          )}
+          <button onClick={() => setTab('whatsapp')} className={`px-4 py-2 rounded-full text-sm transition flex items-center gap-1.5 ${tab === 'whatsapp' ? 'bg-green-700 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>
+            💬 WhatsApp {!merchant?.is_premium && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full">PRO</span>}
+          </button>
         </div>
         <button onClick={() => setAiChat(p => ({ ...p, open: true }))} className="flex items-center gap-1.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-full text-sm font-semibold transition shrink-0 ml-4">
           <span>✦</span> AI
@@ -915,7 +913,16 @@ function MerchantDashboardInner() {
           </div>
         )}
 
-        {tab === 'whatsapp' && merchant && (
+        {tab === 'whatsapp' && merchant && !merchant.is_premium && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="text-5xl mb-4">🔒</div>
+            <h2 className="text-2xl font-bold text-white mb-2">WhatsApp is a Premium Feature</h2>
+            <p className="text-gray-400 max-w-md mb-2">Send automated WhatsApp messages to your customers — points earned, tier upgrades, and more. Upgrade to Premium to unlock.</p>
+            <p className="text-sm text-gray-600">Contact us to upgrade your plan.</p>
+          </div>
+        )}
+
+        {tab === 'whatsapp' && merchant && merchant.is_premium && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-green-400">💬 WhatsApp Templates</h2>
