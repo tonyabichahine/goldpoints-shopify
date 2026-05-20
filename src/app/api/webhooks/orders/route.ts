@@ -117,6 +117,27 @@ export async function POST(req: NextRequest) {
     } catch {}
   })()
 
+  // Flow attribution: last-touch within attribution window, split by channel
+  ;(async () => {
+    try {
+      const { data: flowSend } = await supabaseAdmin
+        .from('flow_sends')
+        .select('flow_id, channel')
+        .eq('customer_id', customer.id)
+        .eq('merchant_id', merchant.id)
+        .gte('sent_at', attributionWindow)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (flowSend) {
+        await supabaseAdmin.from('flow_attributions').insert({
+          flow_id: flowSend.flow_id, merchant_id: merchant.id, customer_id: customer.id,
+          shopify_order_id: String(order.id), revenue: orderTotal, channel: flowSend.channel,
+        })
+      }
+    } catch {}
+  })()
+
   if (newTier !== customer.tier) {
     const trigger = newTier === 'Gold' ? 'tier_gold' : newTier === 'Silver' ? 'tier_silver' : null
     if (trigger) {

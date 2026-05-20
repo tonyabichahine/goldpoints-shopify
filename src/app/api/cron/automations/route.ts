@@ -92,6 +92,7 @@ async function processEnrollment(enrollment: any) {
             .update({ last_email_sent_at: new Date().toISOString() })
             .eq('id', enrollment.id)
           enrollment.last_email_sent_at = new Date().toISOString()
+          supabaseAdmin.from('flow_sends').insert({ flow_id: enrollment.flow_id, merchant_id: enrollment.merchant_id, customer_id: customer.id, channel: 'email' }).then(() => {})
         }
       } else if (node.type === 'whatsapp') {
         currentNodeId = getNextNodeId(node.id, edges)
@@ -106,6 +107,7 @@ async function processEnrollment(enrollment: any) {
             .update({ whatsapp_credits: Math.max(0, whatsappCredits - 1) })
             .eq('id', enrollment.merchant_id)
           whatsappCredits--
+          supabaseAdmin.from('flow_sends').insert({ flow_id: enrollment.flow_id, merchant_id: enrollment.merchant_id, customer_id: customer.id, channel: 'whatsapp' }).then(() => {})
         }
       } else if (node.type === 'wait') {
         const ms = (node.data.unit === 'hours' ? 3600000 : 86400000) * (node.data.amount || 1)

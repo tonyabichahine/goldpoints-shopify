@@ -14,15 +14,29 @@ export async function GET(req: NextRequest) {
     const { data } = await supabaseAdmin.from('automation_flows').select('*').eq('id', id).eq('merchant_id', merchantId).single()
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (analytics) {
+      const period = req.nextUrl.searchParams.get('period') || '30'
+      const cutoff = period === 'all' ? null : new Date(Date.now() - parseInt(period) * 86400000).toISOString()
       const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString()
-      const [{ data: enrollments }, { data: recent }] = await Promise.all([
+
+      let sendsQ = supabaseAdmin.from('flow_sends').select('channel').eq('flow_id', id)
+      let attribQ = supabaseAdmin.from('flow_attributions').select('channel, revenue').eq('flow_id', id)
+      if (cutoff) { sendsQ = sendsQ.gte('sent_at', cutoff); attribQ = attribQ.gte('created_at', cutoff) }
+
+      const [{ data: enrollments }, { data: recent }, { data: sends }, { data: attribs }] = await Promise.all([
         supabaseAdmin.from('automation_enrollments').select('status').eq('flow_id', id),
         supabaseAdmin.from('automation_enrollments').select('enrolled_at').eq('flow_id', id).gte('enrolled_at', cutoff30),
+        sendsQ,
+        attribQ,
       ])
       const total = enrollments?.length || 0
       const active = enrollments?.filter(e => e.status === 'active').length || 0
       const completed = enrollments?.filter(e => e.status === 'completed').length || 0
       const error = enrollments?.filter(e => e.status === 'error').length || 0
+
+      const email_sends = (sends || []).filter(s => s.channel === 'email').length
+      const whatsapp_sends = (sends || []).filter(s => s.channel === 'whatsapp').length
+      const email_revenue = (attribs || []).filter(a => a.channel === 'email').reduce((s, a) => s + (parseFloat(String(a.revenue)) || 0), 0)
+      const whatsapp_revenue = (attribs || []).filter(a => a.channel === 'whatsapp').reduce((s, a) => s + (parseFloat(String(a.revenue)) || 0), 0)
 
       const dayCountMap: Record<string, number> = {}
       for (const e of recent || []) {
@@ -35,7 +49,7 @@ export async function GET(req: NextRequest) {
         trend.push({ date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: dayCountMap[d.toISOString().substring(0, 10)] || 0 })
       }
 
-      return NextResponse.json({ ...data, analytics: { total, active, completed, error, trend } })
+      return NextResponse.json({ ...data, analytics: { total, active, completed, error, trend, email_sends, whatsapp_sends, email_revenue, whatsapp_revenue } })
     }
     return NextResponse.json(data)
   }

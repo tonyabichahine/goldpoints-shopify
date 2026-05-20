@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     { data: campaignAttribs },
     { data: recentCampaigns },
     { count: activeFlowsCount },
+    { data: flowAttribs },
   ] = await Promise.all([
     supabaseAdmin.from('customers').select('*', { count: 'exact', head: true }).eq('merchant_id', merchantId),
     supabaseAdmin.from('point_transactions').select('points, type, created_at').eq('merchant_id', merchantId).gte('created_at', since30),
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from('campaign_attributions').select('revenue').eq('merchant_id', merchantId).gte('created_at', since30),
     supabaseAdmin.from('campaigns').select('id, name, recipient_count, created_at').eq('merchant_id', merchantId).order('created_at', { ascending: false }).limit(20),
     supabaseAdmin.from('automation_flows').select('*', { count: 'exact', head: true }).eq('merchant_id', merchantId).eq('active', true),
+    supabaseAdmin.from('flow_attributions').select('channel, revenue').eq('merchant_id', merchantId).gte('created_at', since30),
   ])
 
   const totalPointsIssued = (txAll || []).filter(t => t.points > 0).reduce((s, t) => s + t.points, 0)
@@ -82,6 +84,8 @@ export async function GET(req: NextRequest) {
 
   const campaignRevenue = (campaignAttribs || []).reduce((s, a) => s + (parseFloat(a.revenue) || 0), 0)
   const campaignOrders = (campaignAttribs || []).length
+  const flowEmailRevenue = (flowAttribs || []).filter(a => a.channel === 'email').reduce((s, a) => s + (parseFloat(String(a.revenue)) || 0), 0)
+  const flowWhatsappRevenue = (flowAttribs || []).filter(a => a.channel === 'whatsapp').reduce((s, a) => s + (parseFloat(String(a.revenue)) || 0), 0)
 
   // Per-campaign attribution + click counts for the recent campaigns list
   const recentCampaignIds = (recentCampaigns || []).map(c => c.id)
@@ -116,6 +120,8 @@ export async function GET(req: NextRequest) {
     totalPointsLiability,
     campaignRevenue,
     campaignOrders,
+    flowEmailRevenue,
+    flowWhatsappRevenue,
     recentCampaigns: recentCampaignsWithStats,
     activeFlowsCount: activeFlowsCount || 0,
     tierBreakdown,

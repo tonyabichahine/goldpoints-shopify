@@ -9,7 +9,7 @@ interface Campaign { id: string; name: string; subject: string; body: string; se
 interface FlowSummary { id: string; name: string; trigger: string; active: boolean; created_at: string; enrolled: number; active_enrollments: number; completed_enrollments: number; error_enrollments: number }
 interface Analytics {
   totalCustomers: number; totalPointsIssued: number; totalPointsRedeemed: number; totalRedemptions: number
-  totalPointsLiability: number; campaignRevenue: number; campaignOrders: number
+  totalPointsLiability: number; campaignRevenue: number; campaignOrders: number; flowEmailRevenue: number; flowWhatsappRevenue: number
   activeFlowsCount: number
   recentCampaigns: { id: string; name: string; recipient_count: number; created_at: string; attributed_revenue: number; attributed_orders: number; link_clicks: number }[]
   tierBreakdown: { Bronze: number; Silver: number; Gold: number }
@@ -141,7 +141,8 @@ function MerchantDashboardInner() {
   const [campaignDetail, setCampaignDetail] = useState<Campaign | null>(null)
   const [campaignSort, setCampaignSort] = useState<'recent' | 'revenue_high' | 'revenue_low' | 'clicks'>('recent')
   const [flowDetail, setFlowDetail] = useState<FlowSummary | null>(null)
-  const [flowAnalytics, setFlowAnalytics] = useState<{ total: number; active: number; completed: number; error: number; trend: { date: string; value: number }[] } | null>(null)
+  const [flowAnalytics, setFlowAnalytics] = useState<{ total: number; active: number; completed: number; error: number; trend: { date: string; value: number }[]; email_sends: number; whatsapp_sends: number; email_revenue: number; whatsapp_revenue: number } | null>(null)
+  const [flowPeriod, setFlowPeriod] = useState('30')
   const [tierFilter, setTierFilter] = useState<'All' | 'Bronze' | 'Silver' | 'Gold'>('All')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -170,11 +171,11 @@ function MerchantDashboardInner() {
 
   useEffect(() => {
     if (!flowDetail) { setFlowAnalytics(null); return }
-    fetch(`/api/merchant/flows?id=${flowDetail.id}&analytics=1`)
+    fetch(`/api/merchant/flows?id=${flowDetail.id}&analytics=1&period=${flowPeriod}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.analytics) setFlowAnalytics(d.analytics) })
       .catch(() => {})
-  }, [flowDetail?.id])
+  }, [flowDetail?.id, flowPeriod])
 
   async function loadWaTemplates() {
     setWaLoading(true)
@@ -467,6 +468,20 @@ function MerchantDashboardInner() {
                     </div>
                   ))}
                 </div>
+
+                {/* Flow Revenue */}
+                {((analytics.flowEmailRevenue ?? 0) > 0 || (analytics.flowWhatsappRevenue ?? 0) > 0) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-[#16162a] border border-white/10 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-400">${(analytics.flowEmailRevenue ?? 0).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500 mt-1">Flow Email Revenue (30d)</div>
+                    </div>
+                    <div className="bg-[#16162a] border border-white/10 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-green-400">${(analytics.flowWhatsappRevenue ?? 0).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500 mt-1">Flow WhatsApp Revenue (30d)</div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Points Liability */}
                 <div className="bg-[#16162a] border border-rose-500/20 rounded-xl px-5 py-4 flex items-center justify-between">
@@ -1334,6 +1349,32 @@ function MerchantDashboardInner() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                {/* Period filter */}
+                <div className="flex gap-1.5">
+                  {[['7', '7d'], ['30', '30d'], ['90', '90d'], ['all', 'All']].map(([v, l]) => (
+                    <button key={v} onClick={() => setFlowPeriod(v)} className={`px-3 py-1 rounded-lg text-xs font-medium transition ${flowPeriod === v ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:text-white'}`}>{l}</button>
+                  ))}
+                </div>
+
+                {/* Channel performance */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-[#0f0f1a] rounded-xl p-4">
+                    <div className="text-sm mb-2">✉️ Email</div>
+                    <div className="text-xl font-bold text-blue-400">{(flowAnalytics?.email_sends ?? 0).toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">messages sent</div>
+                    <div className="text-base font-semibold text-emerald-400 mt-2">${(flowAnalytics?.email_revenue ?? 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">attributed revenue</div>
+                  </div>
+                  <div className="bg-[#0f0f1a] rounded-xl p-4">
+                    <div className="text-sm mb-2">💬 WhatsApp</div>
+                    <div className="text-xl font-bold text-green-400">{(flowAnalytics?.whatsapp_sends ?? 0).toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">messages sent</div>
+                    <div className="text-base font-semibold text-emerald-400 mt-2">${(flowAnalytics?.whatsapp_revenue ?? 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">attributed revenue</div>
+                  </div>
+                </div>
+
+                {/* Enrollment stats */}
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { label: 'Total Enrolled', value: f.enrolled.toLocaleString(), icon: '👥', color: 'text-white' },
