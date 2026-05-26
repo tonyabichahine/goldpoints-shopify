@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
 interface WaTemplate { id: string; name: string; category: string; body: string; status: string; rejection_reason: string | null; created_at: string }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
@@ -1337,6 +1337,61 @@ function MerchantDashboardInner() {
                 </div>
                 <div><label className="block text-sm text-gray-400 mb-1">Vertical spacing (px)</label><input type="number" value={merchant.widget_offset_bottom ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_bottom: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Side spacing (px)</label><input type="number" value={merchant.widget_offset_side ?? 24} onChange={e => setMerchant(p => p ? {...p, widget_offset_side: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-24" /></div>
+
+                {/* Phone field settings */}
+                <div className="border-t border-white/10 pt-4">
+                  <label className="block text-sm text-gray-300 font-semibold mb-3">Phone Number Field</label>
+                  <div className="flex items-center gap-3 mb-3">
+                    <label className="text-sm text-gray-400">Required?</label>
+                    <button onClick={() => setMerchant(p => p ? {...p, widget_phone_required: !p.widget_phone_required} : p)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${merchant.widget_phone_required ? 'bg-purple-600' : 'bg-white/10'}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${merchant.widget_phone_required ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-xs text-gray-500">{merchant.widget_phone_required ? 'Required' : 'Optional'}</span>
+                  </div>
+                  <label className="block text-sm text-gray-400 mb-1">Country / Dial Code</label>
+                  <select value={merchant.widget_store_country || 'INTL'} onChange={e => setMerchant(p => p ? {...p, widget_store_country: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full max-w-xs">
+                    <option value="INTL">🌍 International (customer picks country)</option>
+                    <option value="US">🇺🇸 United States (+1)</option>
+                    <option value="GB">🇬🇧 United Kingdom (+44)</option>
+                    <option value="CA">🇨🇦 Canada (+1)</option>
+                    <option value="AU">🇦🇺 Australia (+61)</option>
+                    <option value="LB">🇱🇧 Lebanon (+961)</option>
+                    <option value="AE">🇦🇪 UAE (+971)</option>
+                    <option value="SA">🇸🇦 Saudi Arabia (+966)</option>
+                    <option value="KW">🇰🇼 Kuwait (+965)</option>
+                    <option value="QA">🇶🇦 Qatar (+974)</option>
+                    <option value="BH">🇧🇭 Bahrain (+973)</option>
+                    <option value="OM">🇴🇲 Oman (+968)</option>
+                    <option value="JO">🇯🇴 Jordan (+962)</option>
+                    <option value="EG">🇪🇬 Egypt (+20)</option>
+                    <option value="TR">🇹🇷 Turkey (+90)</option>
+                    <option value="DE">🇩🇪 Germany (+49)</option>
+                    <option value="FR">🇫🇷 France (+33)</option>
+                    <option value="IT">🇮🇹 Italy (+39)</option>
+                    <option value="ES">🇪🇸 Spain (+34)</option>
+                    <option value="NL">🇳🇱 Netherlands (+31)</option>
+                    <option value="SE">🇸🇪 Sweden (+46)</option>
+                    <option value="NO">🇳🇴 Norway (+47)</option>
+                    <option value="CH">🇨🇭 Switzerland (+41)</option>
+                    <option value="PL">🇵🇱 Poland (+48)</option>
+                    <option value="IN">🇮🇳 India (+91)</option>
+                    <option value="PK">🇵🇰 Pakistan (+92)</option>
+                    <option value="NG">🇳🇬 Nigeria (+234)</option>
+                    <option value="ZA">🇿🇦 South Africa (+27)</option>
+                    <option value="BR">🇧🇷 Brazil (+55)</option>
+                    <option value="MX">🇲🇽 Mexico (+52)</option>
+                    <option value="SG">🇸🇬 Singapore (+65)</option>
+                    <option value="MY">🇲🇾 Malaysia (+60)</option>
+                    <option value="PH">🇵🇭 Philippines (+63)</option>
+                    <option value="JP">🇯🇵 Japan (+81)</option>
+                    <option value="KR">🇰🇷 South Korea (+82)</option>
+                    <option value="HK">🇭🇰 Hong Kong (+852)</option>
+                    <option value="NZ">🇳🇿 New Zealand (+64)</option>
+                    <option value="MA">🇲🇦 Morocco (+212)</option>
+                  </select>
+                  <p className="text-xs text-gray-600 mt-1">Single country: shows flag + dial code automatically. International: customer picks from a dropdown.</p>
+                </div>
+
                 <div><label className="block text-sm text-gray-400 mb-1">Points per $1 spent</label><input type="number" value={merchant.points_per_dollar || 1} onChange={e => setMerchant(p => p ? {...p, points_per_dollar: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Sign-up bonus points</label><input type="number" value={merchant.signup_bonus || 0} onChange={e => setMerchant(p => p ? {...p, signup_bonus: +e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Birthday bonus points</label><input type="number" value={(merchant as any).birthday_bonus || 0} onChange={e => setMerchant(p => p ? {...p, birthday_bonus: +e.target.value} as any : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-32" /></div>

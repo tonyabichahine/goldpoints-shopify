@@ -97,6 +97,10 @@
     .gp-field-label{font-size:.78rem;color:#7878a0;display:block;margin-bottom:4px}
     .gp-logout{font-size:.75rem;color:#5050a0;background:none;border:none;cursor:pointer;margin-top:8px;text-decoration:underline;display:block}
     .gp-copy-toast{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#fff;font-size:.72rem;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none}
+    .gp-phone-row{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+    .gp-phone-prefix{background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 10px;color:#e0e0f0;font-size:.85rem;white-space:nowrap;flex-shrink:0}
+    .gp-phone-select{background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 8px;color:#e0e0f0;font-size:.8rem;flex-shrink:0;max-width:130px;outline:none}
+    .gp-phone-input{flex:1;margin-bottom:0!important}
   `
   document.head.appendChild(style)
 
@@ -117,6 +121,90 @@
     const c1 = color()
     const c2 = config && config.widget_gradient_color
     return c2 ? `linear-gradient(135deg,${c1},${c2})` : c1
+  }
+
+  const COUNTRIES = [
+    {c:'INTL',f:'🌍',d:'',n:'International'},
+    {c:'US',f:'🇺🇸',d:'+1',n:'United States'},
+    {c:'GB',f:'🇬🇧',d:'+44',n:'United Kingdom'},
+    {c:'CA',f:'🇨🇦',d:'+1',n:'Canada'},
+    {c:'AU',f:'🇦🇺',d:'+61',n:'Australia'},
+    {c:'LB',f:'🇱🇧',d:'+961',n:'Lebanon'},
+    {c:'AE',f:'🇦🇪',d:'+971',n:'UAE'},
+    {c:'SA',f:'🇸🇦',d:'+966',n:'Saudi Arabia'},
+    {c:'KW',f:'🇰🇼',d:'+965',n:'Kuwait'},
+    {c:'QA',f:'🇶🇦',d:'+974',n:'Qatar'},
+    {c:'BH',f:'🇧🇭',d:'+973',n:'Bahrain'},
+    {c:'OM',f:'🇴🇲',d:'+968',n:'Oman'},
+    {c:'JO',f:'🇯🇴',d:'+962',n:'Jordan'},
+    {c:'EG',f:'🇪🇬',d:'+20',n:'Egypt'},
+    {c:'IQ',f:'🇮🇶',d:'+964',n:'Iraq'},
+    {c:'TR',f:'🇹🇷',d:'+90',n:'Turkey'},
+    {c:'MA',f:'🇲🇦',d:'+212',n:'Morocco'},
+    {c:'TN',f:'🇹🇳',d:'+216',n:'Tunisia'},
+    {c:'DZ',f:'🇩🇿',d:'+213',n:'Algeria'},
+    {c:'DE',f:'🇩🇪',d:'+49',n:'Germany'},
+    {c:'FR',f:'🇫🇷',d:'+33',n:'France'},
+    {c:'IT',f:'🇮🇹',d:'+39',n:'Italy'},
+    {c:'ES',f:'🇪🇸',d:'+34',n:'Spain'},
+    {c:'NL',f:'🇳🇱',d:'+31',n:'Netherlands'},
+    {c:'SE',f:'🇸🇪',d:'+46',n:'Sweden'},
+    {c:'NO',f:'🇳🇴',d:'+47',n:'Norway'},
+    {c:'CH',f:'🇨🇭',d:'+41',n:'Switzerland'},
+    {c:'PL',f:'🇵🇱',d:'+48',n:'Poland'},
+    {c:'IN',f:'🇮🇳',d:'+91',n:'India'},
+    {c:'PK',f:'🇵🇰',d:'+92',n:'Pakistan'},
+    {c:'NG',f:'🇳🇬',d:'+234',n:'Nigeria'},
+    {c:'ZA',f:'🇿🇦',d:'+27',n:'South Africa'},
+    {c:'BR',f:'🇧🇷',d:'+55',n:'Brazil'},
+    {c:'MX',f:'🇲🇽',d:'+52',n:'Mexico'},
+    {c:'SG',f:'🇸🇬',d:'+65',n:'Singapore'},
+    {c:'MY',f:'🇲🇾',d:'+60',n:'Malaysia'},
+    {c:'PH',f:'🇵🇭',d:'+63',n:'Philippines'},
+    {c:'JP',f:'🇯🇵',d:'+81',n:'Japan'},
+    {c:'KR',f:'🇰🇷',d:'+82',n:'South Korea'},
+    {c:'HK',f:'🇭🇰',d:'+852',n:'Hong Kong'},
+    {c:'NZ',f:'🇳🇿',d:'+64',n:'New Zealand'},
+  ]
+
+  function getCountry() {
+    const cc = config && config.widget_store_country
+    return COUNTRIES.find(x => x.c === cc) || null
+  }
+
+  function phoneFieldHTML(phoneId, countrySelectId) {
+    const req = config && config.widget_phone_required
+    const label = req ? 'Phone number *' : 'Phone number <span style="opacity:.5;font-size:.72rem">(optional)</span>'
+    const ctry = getCountry()
+    const isIntl = !ctry || ctry.c === 'INTL'
+    if (isIntl) {
+      const opts = COUNTRIES.filter(x => x.c !== 'INTL').map(x => `<option value="${x.c}">${x.f} ${x.d} ${x.n}</option>`).join('')
+      return `<label class="gp-field-label">${label}</label>
+        <div class="gp-phone-row">
+          <select class="gp-phone-select" id="${countrySelectId}">${opts}</select>
+          <input class="gp-input gp-phone-input" id="${phoneId}" type="tel" placeholder="555 000 000" style="margin-bottom:0" />
+        </div>`
+    }
+    return `<label class="gp-field-label">${label}</label>
+      <div class="gp-phone-row">
+        <div class="gp-phone-prefix">${ctry.f} ${ctry.d}</div>
+        <input class="gp-input gp-phone-input" id="${phoneId}" type="tel" placeholder="71 123 456" style="margin-bottom:0" />
+      </div>`
+  }
+
+  function readPhone(phoneId, countrySelectId) {
+    const phoneEl = document.getElementById(phoneId)
+    const val = phoneEl ? phoneEl.value.trim() : ''
+    if (!val) return ''
+    const ctry = getCountry()
+    const isIntl = !ctry || ctry.c === 'INTL'
+    if (isIntl) {
+      const sel = document.getElementById(countrySelectId)
+      const chosen = sel ? COUNTRIES.find(x => x.c === sel.value) : null
+      const dial = chosen ? chosen.d : ''
+      return val.startsWith('+') ? val : `${dial}${val}`
+    }
+    return val.startsWith('+') ? val : `${ctry.d}${val}`
   }
 
   function tierInfo(lifetimePts) {
@@ -295,8 +383,7 @@
         <input class="gp-input" value="${esc(CUSTOMER_EMAIL)}" type="email" disabled />
         <label class="gp-field-label">Date of birth <span style="opacity:.5;font-size:.72rem">(optional)</span></label>
         <input class="gp-input" id="gp-profile-birthday" type="date" />
-        <label class="gp-field-label">Phone number <span style="opacity:.5;font-size:.72rem">(optional, include country code)</span></label>
-        <input class="gp-input" id="gp-profile-phone" type="tel" placeholder="+1 555 000 0000" />
+        ${phoneFieldHTML('gp-profile-phone','gp-profile-country')}
         <label class="gp-consent"><input type="checkbox" id="gp-marketing-consent" /> I would like to receive promotions by email <span style="opacity:.5">(optional)</span></label>
         <label class="gp-consent"><input type="checkbox" id="gp-whatsapp-consent" /> Send me updates on WhatsApp <span style="opacity:.5">(optional)</span></label>
         <button class="gp-btn-main" id="gp-profile-save" style="background:${c}">Save & Start Earning</button>
@@ -322,8 +409,7 @@
         <input class="gp-input" id="gp-reg-email" type="email" placeholder="your@email.com" />
         <label class="gp-field-label">Password *</label>
         <input class="gp-input" id="gp-reg-password" type="password" placeholder="Create a password" />
-        <label class="gp-field-label">Phone number <span style="opacity:.5;font-size:.72rem">(optional, include country code)</span></label>
-        <input class="gp-input" id="gp-reg-phone" type="tel" placeholder="+1 555 000 0000" />
+        ${phoneFieldHTML('gp-reg-phone','gp-reg-country')}
         <label class="gp-consent"><input type="checkbox" id="gp-reg-whatsapp" /> Send me updates on WhatsApp <span style="opacity:.5">(optional)</span></label>
         <button class="gp-btn-main" id="gp-reg-submit" style="background:${c}">Create Account</button>
         <p id="gp-reg-msg" class="gp-msg"></p>
@@ -492,8 +578,7 @@
           <div style="padding-top:4px">
             <label class="gp-field-label">Date of birth</label>
             <input class="gp-input" id="gp-edit-birthday" type="date" value="${esc(customer.birthday||'')}" />
-            <label class="gp-field-label">Phone number <span style="opacity:.5;font-size:.72rem">(include country code)</span></label>
-            <input class="gp-input" id="gp-edit-phone" type="tel" placeholder="+1 555 000 0000" value="${esc(customer.phone||'')}" />
+            ${phoneFieldHTML('gp-edit-phone','gp-edit-country')}
             <label class="gp-consent"><input type="checkbox" id="gp-edit-consent" ${customer.marketing_consent?'checked':''} /> I would like to receive promotions by email</label>
             <label class="gp-consent"><input type="checkbox" id="gp-edit-whatsapp" ${customer.whatsapp_consent?'checked':''} /> Send me updates on WhatsApp</label>
             <button class="gp-btn-main" id="gp-edit-save" style="background:${c}">Save Changes</button>
@@ -550,8 +635,9 @@
         const birthday = document.getElementById('gp-profile-birthday').value
         const marketing_consent = document.getElementById('gp-marketing-consent').checked
         const whatsapp_consent = document.getElementById('gp-whatsapp-consent').checked
-        const phone = document.getElementById('gp-profile-phone').value.trim()
+        const phone = readPhone('gp-profile-phone','gp-profile-country')
         const msg = document.getElementById('gp-profile-msg')
+        if (config && config.widget_phone_required && !phone) { msg.textContent='Phone number is required.'; msg.style.color='#e74c3c'; return }
         msg.textContent='Saving...'; msg.style.color='#7878a0'
         const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email:CUSTOMER_EMAIL,name,birthday,marketing_consent,whatsapp_consent,phone,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
@@ -580,10 +666,11 @@
         const name = document.getElementById('gp-reg-name').value.trim()
         const email = document.getElementById('gp-reg-email').value.trim()
         const password = document.getElementById('gp-reg-password').value
-        const phone = document.getElementById('gp-reg-phone').value.trim()
+        const phone = readPhone('gp-reg-phone','gp-reg-country')
         const whatsapp_consent = document.getElementById('gp-reg-whatsapp').checked
         const msg = document.getElementById('gp-reg-msg')
         if (!name || !email || !password) { msg.textContent='All fields are required.'; msg.style.color='#e74c3c'; return }
+        if (config && config.widget_phone_required && !phone) { msg.textContent='Phone number is required.'; msg.style.color='#e74c3c'; return }
         msg.textContent='Creating account...'; msg.style.color='#7878a0'
         const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name,password,phone,whatsapp_consent,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
@@ -672,7 +759,7 @@
           const birthday = document.getElementById('gp-edit-birthday').value
           const marketing_consent = document.getElementById('gp-edit-consent').checked
           const whatsapp_consent = document.getElementById('gp-edit-whatsapp').checked
-          const phone = document.getElementById('gp-edit-phone').value.trim()
+          const phone = readPhone('gp-edit-phone','gp-edit-country')
           const msg = document.getElementById('gp-edit-msg')
           msg.textContent='Saving...'; msg.style.color='#7878a0'
           const email = (customer&&customer.email)||CUSTOMER_EMAIL||localStorage.getItem(STORAGE_KEY)
