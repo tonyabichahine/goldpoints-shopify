@@ -113,6 +113,11 @@
   async function api(path, opts = {}) { const r = await fetch(BASE + path, opts); return r.json() }
   function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
   function color() { return (config && config.widget_primary_color) || '#6c3fff' }
+  function colorBg() {
+    const c1 = color()
+    const c2 = config && config.widget_gradient_color
+    return c2 ? `linear-gradient(135deg,${c1},${c2})` : c1
+  }
 
   function tierInfo(lifetimePts) {
     const silver = (config && config.tier_silver) || 500
@@ -135,7 +140,7 @@
     render('loading')
     config = await api(`/api/widget/config?shop=${SHOP}`)
     if (config.error) { btn.style.opacity='1'; btn.style.pointerEvents='auto'; render('error'); return }
-    btn.style.background = color()
+    btn.style.background = colorBg()
     const tc = config.widget_btn_text_color || '#ffffff'
     btn.style.color = tc
     const existingTc = document.getElementById('gp-tc-style')
