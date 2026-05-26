@@ -76,13 +76,17 @@ export default function AdminPage() {
   const [waToken, setWaToken] = useState('')
   const [waSaving, setWaSaving] = useState(false)
   const [waMsg, setWaMsg] = useState('')
+  const [loginPw, setLoginPw] = useState('')
+  const [loginErr, setLoginErr] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [authed, setAuthed] = useState(false)
 
   useEffect(() => { load(); loadCronStatus(); loadEnrollmentStats(); loadDeletedCustomers() }, [])
 
   async function load() {
     setLoading(true)
     const r = await fetch('/api/admin/overview')
-    if (r.status === 401) { router.push('/'); return }
+    if (r.status === 401) { setLoading(false); return }
     setData(await r.json())
     setLoading(false)
   }
@@ -227,8 +231,31 @@ export default function AdminPage() {
     loadEnrollmentStats()
   }
 
-  if (loading) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>
-  if (!data) return null
+  async function doLogin() {
+    setLoginLoading(true); setLoginErr('')
+    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: loginPw }) })
+    if (!r.ok) { setLoginErr('Wrong password.'); setLoginLoading(false); return }
+    setAuthed(true); setLoginLoading(false); load()
+  }
+
+  if (!authed && !data && !loading) return (
+    <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center">
+      <div className="bg-[#16162a] border border-white/10 rounded-2xl p-8 w-full max-w-sm space-y-4">
+        <h1 className="text-xl font-bold text-yellow-400 text-center">GoldPoints Admin</h1>
+        <input
+          type="password" value={loginPw} onChange={e => setLoginPw(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doLogin()}
+          placeholder="Enter admin password"
+          className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-yellow-500"
+        />
+        {loginErr && <p className="text-red-400 text-sm">{loginErr}</p>}
+        <button onClick={doLogin} disabled={loginLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-semibold py-2 rounded-lg text-sm">
+          {loginLoading ? 'Logging in...' : 'Log In'}
+        </button>
+      </div>
+    </div>
+  )
+  if (loading || !data) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>
 
   return (
     <div className="min-h-screen bg-[#0f0f1a] text-white">
