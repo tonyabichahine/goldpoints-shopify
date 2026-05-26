@@ -4,6 +4,20 @@ import { getTier, buildUpgradeBonusData, SHOPIFY_API_SECRET, tagShopifyCustomer 
 import { fireAutomation, enrollInFlows } from '@/lib/email'
 import crypto from 'crypto'
 
+async function awardCampaignBonus(campaignId: string, merchantId: string, customerId: string, currentPoints: number) {
+  const { data: campaign } = await supabaseAdmin.from('campaigns').select('bonus_points').eq('id', campaignId).single()
+  const bonus = campaign?.bonus_points || 0
+  if (bonus <= 0) return
+  await Promise.all([
+    supabaseAdmin.from('customers').update({ points: currentPoints + bonus }).eq('id', customerId),
+    supabaseAdmin.from('point_transactions').insert({
+      merchant_id: merchantId, customer_id: customerId,
+      type: 'earn_campaign_bonus', points: bonus,
+      description: 'Campaign purchase bonus',
+    }),
+  ])
+}
+
 export async function POST(req: NextRequest) {
   const shop = req.headers.get('x-shopify-shop-domain') || ''
   const hmac = req.headers.get('x-shopify-hmac-sha256') || ''
@@ -99,6 +113,7 @@ export async function POST(req: NextRequest) {
           campaign_id: campaignId, merchant_id: merchant.id, customer_id: customer.id,
           shopify_order_id: String(order.id), revenue: orderTotal, attributed_via: 'click',
         })
+        await awardCampaignBonus(campaignId, merchant.id, customer.id, newPoints)
         return
       }
 
@@ -114,6 +129,7 @@ export async function POST(req: NextRequest) {
         campaign_id: send.campaign_id, merchant_id: merchant.id, customer_id: customer.id,
         shopify_order_id: String(order.id), revenue: orderTotal, attributed_via: 'send',
       })
+      await awardCampaignBonus(send.campaign_id, merchant.id, customer.id, newPoints)
     } catch {}
   })()
 

@@ -162,7 +162,7 @@ function MerchantDashboardInner() {
   const [flows, setFlows] = useState<FlowSummary[]>([])
   const [flowsLoading, setFlowsLoading] = useState(false)
   const [creatingFlow, setCreatingFlow] = useState(false)
-  const [newCampaign, setNewCampaign] = useState({ name: '', subject: '', body: '', segment: 'all' })
+  const [newCampaign, setNewCampaign] = useState({ name: '', subject: '', body: '', segment: 'all', bonusPoints: 0 })
   const [campaignSending, setCampaignSending] = useState(false)
   const [campaignMsg, setCampaignMsg] = useState('')
   const [aiChat, setAiChat] = useState<{ open: boolean; messages: { role: 'user' | 'ai'; content: string }[]; loading: boolean; input: string }>({ open: false, messages: [], loading: false, input: '' })
@@ -316,7 +316,7 @@ function MerchantDashboardInner() {
     if (!r.ok) { setCampaignMsg(d.error || 'Failed to send.'); setCampaignSending(false); return }
     setCampaignMsg(`✓ Sent to ${d.sent} customers!`)
     setCampaigns(prev => [d.campaign, ...prev])
-    setNewCampaign({ name: '', subject: '', body: '', segment: 'all' })
+    setNewCampaign({ name: '', subject: '', body: '', segment: 'all', bonusPoints: 0 })
     setCampaignSending(false)
   }
 
@@ -888,6 +888,16 @@ function MerchantDashboardInner() {
                         <div className={`flex-1 rounded-xl p-3 text-center text-xs ${c.whatsapp_consent !== false ? 'bg-green-900/20 text-green-400' : 'bg-white/5 text-gray-500'}`}>💬 WhatsApp {c.whatsapp_consent !== false ? 'Opted in' : 'Opted out'}</div>
                       </div>
 
+                      {/* Delete */}
+                      <button onClick={async () => {
+                        if (!confirm(`Delete ${c.name || c.email}? They'll be archived and can be restored from the admin panel.`)) return
+                        await fetch(`/api/merchant/customers?id=${c.id}`, { method: 'DELETE' })
+                        setCustomers(prev => prev.filter((x: any) => x.id !== c.id))
+                        setCustomerDetail(null)
+                      }} className="w-full text-red-500 hover:text-red-400 border border-red-900/40 hover:border-red-700/40 text-sm font-semibold py-2 rounded-xl transition">
+                        Delete Customer
+                      </button>
+
                       {/* Transaction History */}
                       <div>
                         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recent Activity</div>
@@ -988,6 +998,10 @@ function MerchantDashboardInner() {
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Subject line</label>
                   <input value={newCampaign.subject} onChange={e => setNewCampaign(p => ({...p, subject: e.target.value}))} placeholder="You have rewards waiting 🎁" className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Bonus points on purchase <span className="text-gray-600 font-normal">(optional — awarded automatically when a recipient buys)</span></label>
+                  <input type="number" min={0} value={newCampaign.bonusPoints || ''} onChange={e => setNewCampaign(p => ({...p, bonusPoints: Math.max(0, parseInt(e.target.value) || 0)}))} placeholder="0" className="w-32 bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Email body</label>
@@ -1680,8 +1694,8 @@ function MerchantDashboardInner() {
 
       {drawer.type && (() => {
         const TYPE_LABEL: Record<string, string> = {
-          earn_order: 'Purchase', earn_signup: 'Sign-up bonus', earn_referral: 'Referral',
-          earn_follow: 'Social follow', earn_birthday: 'Birthday bonus',
+          earn_order: 'Purchase', earn_purchase: 'Purchase', earn_signup: 'Sign-up bonus', earn_referral: 'Referral',
+          earn_follow: 'Social follow', earn_birthday: 'Birthday bonus', earn_campaign_bonus: 'Campaign bonus',
           redeem: 'Redemption', deduct_cancel: 'Order cancelled',
         }
         const PERIODS = [{ v: '7', l: '7 days' }, { v: '30', l: '30 days' }, { v: '90', l: '90 days' }, { v: 'all', l: 'All time' }]

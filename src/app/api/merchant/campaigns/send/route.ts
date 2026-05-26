@@ -66,8 +66,9 @@ export async function POST(req: NextRequest) {
   const merchantId = getMerchantId(req)
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-  const { name, subject, emailBody, segment } = await req.json()
+  const { name, subject, emailBody, segment, bonusPoints } = await req.json()
   if (!name || !subject || !emailBody) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+  const bonusPts = Math.max(0, parseInt(bonusPoints) || 0)
 
   const { data: merchant } = await supabaseAdmin.from('merchants').select('store_name, shopify_domain, email, is_premium, custom_from_email').eq('id', merchantId).single()
   const storeName = merchant?.store_name || 'Our Store'
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
   let campaign: any = null
   try {
     const { data, error: insertError } = await supabaseAdmin.from('campaigns')
-      .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length })
+      .insert({ merchant_id: merchantId, name, subject, body: emailBody, segment: segment || 'all', recipient_count: customers.length, bonus_points: bonusPts })
       .select()
     if (insertError) return NextResponse.json({ error: 'Failed to create campaign', detail: insertError.message }, { status: 500 })
     campaign = data?.[0]
