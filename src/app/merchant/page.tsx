@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
 interface WaTemplate { id: string; name: string; category: string; body: string; status: string; rejection_reason: string | null; created_at: string }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
@@ -1290,31 +1290,38 @@ function MerchantDashboardInner() {
               <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
                 <div><label className="block text-sm text-gray-400 mb-1">Widget Title</label><input value={merchant.widget_title || ''} onChange={e => setMerchant(p => p ? {...p, widget_title: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
 
-                {/* Color style */}
+                {/* Colors */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Button Style</label>
+                  <label className="block text-sm text-gray-300 font-semibold mb-3">Colors</label>
+
+                  {/* CTA button style */}
+                  <p className="text-xs text-gray-500 mb-2">CTA Button style</p>
                   <div className="flex gap-2 mb-3">
                     <button onClick={() => setMerchant(p => p ? {...p, widget_gradient_color: ''} : p)} className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${!merchant.widget_gradient_color ? 'bg-purple-600 border-purple-500 text-white' : 'bg-transparent border-white/10 text-gray-400 hover:text-white'}`}>Solid</button>
                     <button onClick={() => setMerchant(p => p ? {...p, widget_gradient_color: p.widget_gradient_color || '#ff6b6b'} : p)} className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${merchant.widget_gradient_color ? 'bg-purple-600 border-purple-500 text-white' : 'bg-transparent border-white/10 text-gray-400 hover:text-white'}`}>Gradient</button>
                   </div>
 
-                  <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-5 flex-wrap mb-4">
                     <div>
-                      <span className="text-xs text-gray-500 block mb-1">{merchant.widget_gradient_color ? 'Start color' : 'Color'}</span>
+                      <span className="text-xs text-gray-500 block mb-1">{merchant.widget_gradient_color ? 'CTA start color' : 'CTA color'}</span>
                       <input type="color" value={merchant.widget_primary_color || '#6c3fff'} onChange={e => setMerchant(p => p ? {...p, widget_primary_color: e.target.value} : p)} className="h-10 w-16 rounded-lg cursor-pointer bg-transparent border-0" />
                     </div>
                     {merchant.widget_gradient_color && (
                       <div>
-                        <span className="text-xs text-gray-500 block mb-1">End color</span>
-                        <input type="color" value={merchant.widget_gradient_color || '#ff6b6b'} onChange={e => setMerchant(p => p ? {...p, widget_gradient_color: e.target.value} : p)} className="h-10 w-16 rounded-lg cursor-pointer bg-transparent border-0" />
+                        <span className="text-xs text-gray-500 block mb-1">CTA end color</span>
+                        <input type="color" value={merchant.widget_gradient_color} onChange={e => setMerchant(p => p ? {...p, widget_gradient_color: e.target.value} : p)} className="h-10 w-16 rounded-lg cursor-pointer bg-transparent border-0" />
                       </div>
                     )}
                     <div>
-                      <span className="text-xs text-gray-500 block mb-1">Text color</span>
+                      <span className="text-xs text-gray-500 block mb-1">CTA text color</span>
                       <input type="color" value={merchant.widget_btn_text_color || '#ffffff'} onChange={e => setMerchant(p => p ? {...p, widget_btn_text_color: e.target.value} : p)} className="h-10 w-16 rounded-lg cursor-pointer bg-transparent border-0" />
                     </div>
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-1">Widget background</span>
+                      <input type="color" value={merchant.widget_bg_color || '#16162a'} onChange={e => setMerchant(p => p ? {...p, widget_bg_color: e.target.value} : p)} className="h-10 w-16 rounded-lg cursor-pointer bg-transparent border-0" />
+                    </div>
                     {/* Live preview */}
-                    <div className="ml-2">
+                    <div>
                       <span className="text-xs text-gray-500 block mb-1">Preview</span>
                       <div className="h-10 px-4 rounded-full flex items-center gap-2 text-sm font-bold shadow-lg" style={{
                         background: merchant.widget_gradient_color
