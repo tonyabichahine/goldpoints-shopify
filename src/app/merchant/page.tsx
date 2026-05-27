@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null; whatsapp_auto_notify: boolean }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null; whatsapp_auto_notify: boolean; trial_ends_at: string | null }
 interface WaTemplate { id: string; name: string; category: string; body: string; status: string; rejection_reason: string | null; created_at: string }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
@@ -419,6 +419,12 @@ function MerchantDashboardInner() {
   }
 
   const isConnected = merchant && merchant.shopify_domain && merchant.shopify_access_token !== 'pending'
+
+  const trialEndsAt = merchant?.trial_ends_at ? new Date(merchant.trial_ends_at) : null
+  const trialExpired = trialEndsAt ? trialEndsAt < new Date() : false
+  const trialDaysLeft = trialEndsAt && !trialExpired ? Math.ceil((trialEndsAt.getTime() - Date.now()) / 86400000) : 0
+  const onTrial = !!trialEndsAt && !trialExpired
+
   const widgetSnippet = `{% if customer %}\n<script src="https://goldpoints-shopify.vercel.app/widget.js"\n  data-shop="{{ shop.permanent_domain }}"\n  data-customer-email="{{ customer.email }}"\n  data-customer-name="{{ customer.first_name }} {{ customer.last_name }}"></script>\n{% else %}\n<script src="https://goldpoints-shopify.vercel.app/widget.js"\n  data-shop="{{ shop.permanent_domain }}"></script>\n{% endif %}`
 
   if (loading) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-400">Loading...</div>
@@ -434,8 +440,47 @@ function MerchantDashboardInner() {
         <button onClick={logout} className="text-sm bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition">Sign Out</button>
       </header>
 
+      {/* Trial expired — full block */}
+      {trialExpired && (
+        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-8">
+          <div className="max-w-lg w-full text-center">
+            <div className="text-6xl mb-6">⏰</div>
+            <h2 className="text-3xl font-bold text-white mb-3">Your free trial has ended</h2>
+            <p className="text-gray-400 mb-8">Your 14-day free trial is over. Subscribe to keep using GoldPoints and retain all your customer data.</p>
+            <div className="bg-[#16162a] border border-purple-500/30 rounded-2xl p-8 text-left mb-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="text-2xl font-bold text-white">$70 <span className="text-gray-400 text-base font-normal">/ month</span></div>
+                  <div className="text-sm text-gray-400 mt-1">or $700/year (2 months free)</div>
+                </div>
+                <div className="bg-purple-600/20 text-purple-300 text-sm font-semibold px-4 py-2 rounded-full">GoldPoints Pro</div>
+              </div>
+              <ul className="space-y-2 text-sm text-gray-300 mb-6">
+                {['Full loyalty widget on your storefront','Unlimited customers & points','Email campaigns & automation flows','Analytics dashboard','Tier system & rewards','WhatsApp notifications (coming soon)'].map(f => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-green-400">✓</span>{f}</li>
+                ))}
+              </ul>
+              <div className="border-t border-white/10 pt-6">
+                <p className="text-sm text-gray-400 font-semibold mb-4">Pay by bank transfer to activate:</p>
+                <div className="space-y-2 text-sm font-mono bg-[#0f0f1a] rounded-xl p-4">
+                  <div className="flex justify-between"><span className="text-gray-500">Account Holder</span><span className="text-white">TONY MARWAN ABI CHAHINE</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">IBAN</span><span className="text-white">LB42005699840103501930640002</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">SWIFT</span><span className="text-white">AUDBLBBX</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Currency</span><span className="text-white">USD</span></div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">Include your store name in the transfer reference. After payment, contact us to activate your account.</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-6 text-sm">
+              <a href="https://wa.me/96171552479" target="_blank" className="flex items-center gap-2 text-green-400 hover:text-green-300 transition">💬 WhatsApp us</a>
+              <a href="mailto:tonyabichahine@gmail.com" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition">✉️ Email us</a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Connect Shopify banner */}
-      {!isConnected && (
+      {!trialExpired && !isConnected && (
         <div className="bg-yellow-900/40 border-b border-yellow-500/30 px-8 py-4">
           <p className="text-yellow-300 text-sm font-semibold mb-3">⚠️ Connect your Shopify store to activate the widget and start tracking orders</p>
           <div className="flex gap-3 items-center flex-wrap">
@@ -447,7 +492,18 @@ function MerchantDashboardInner() {
         </div>
       )}
 
-      <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
+      {trialExpired && <div className="hidden" />}
+      {/* Trial countdown banner */}
+      {!trialExpired && onTrial && (
+        <div className={`border-b px-8 py-2.5 flex items-center justify-between ${trialDaysLeft <= 3 ? 'bg-red-900/30 border-red-500/30' : 'bg-purple-900/30 border-purple-500/20'}`}>
+          <p className={`text-sm font-semibold ${trialDaysLeft <= 3 ? 'text-red-300' : 'text-purple-300'}`}>
+            {trialDaysLeft <= 3 ? '⚠️' : '⏳'} {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} left in your free trial
+          </p>
+          <button onClick={() => setTab('settings')} className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition">Subscribe — $70/mo</button>
+        </div>
+      )}
+
+      {!trialExpired && <nav className="flex items-center justify-between px-8 py-3 bg-[#16162a] border-b border-white/10">
         <div className="flex gap-2 flex-wrap">
           {(['overview','customers','offers','campaigns','flows'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-full text-sm capitalize transition ${tab === t ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>{t}</button>
@@ -460,7 +516,8 @@ function MerchantDashboardInner() {
         <button onClick={() => setAiChat(p => ({ ...p, open: true }))} className="flex items-center gap-1.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:opacity-90 px-4 py-2 rounded-full text-sm font-semibold transition shrink-0 ml-4">
           <span>✦</span> AI
         </button>
-      </nav>
+      </nav>}
+      {!trialExpired && <div className="gp-content">
 
       <main className={`p-8 max-w-5xl mx-auto transition-all duration-300 ${aiChat.open ? 'mr-[420px]' : ''}`}>
         {tab === 'overview' && (
@@ -1513,6 +1570,36 @@ function MerchantDashboardInner() {
               </div>
             </div>
 
+            {/* Plan & Billing */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-200 mb-4">Plan & Billing</h3>
+              <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 mb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="font-semibold text-white">{!trialEndsAt ? '✅ Active — GoldPoints Pro' : trialExpired ? '❌ Trial Expired' : `⏳ Free Trial — ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left`}</p>
+                    <p className="text-sm text-gray-400 mt-1">{!trialEndsAt ? 'Your subscription is active.' : trialExpired ? 'Subscribe to reactivate your account.' : `Trial ends ${trialEndsAt?.toLocaleDateString()}`}</p>
+                  </div>
+                  {trialEndsAt && <span className="text-2xl font-bold text-purple-300">$70<span className="text-sm text-gray-400 font-normal">/mo</span></span>}
+                </div>
+                {trialEndsAt && (
+                  <div className="border-t border-white/10 pt-4 space-y-3">
+                    <p className="text-sm text-gray-400 font-semibold">Pay by bank transfer to subscribe:</p>
+                    <div className="space-y-1.5 text-sm font-mono bg-[#0f0f1a] rounded-xl p-4">
+                      <div className="flex justify-between gap-4"><span className="text-gray-500 shrink-0">Account Holder</span><span className="text-white text-right">TONY MARWAN ABI CHAHINE</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-gray-500 shrink-0">IBAN</span><span className="text-white text-right">LB42005699840103501930640002</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-gray-500 shrink-0">SWIFT</span><span className="text-white">AUDBLBBX</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-gray-500 shrink-0">Currency</span><span className="text-white">USD</span></div>
+                    </div>
+                    <p className="text-xs text-gray-500">Include your store name in the reference. After payment contact us to activate:</p>
+                    <div className="flex gap-4 text-sm">
+                      <a href="https://wa.me/96171552479" target="_blank" className="text-green-400 hover:text-green-300 transition">💬 WhatsApp</a>
+                      <a href="mailto:tonyabichahine@gmail.com" className="text-purple-400 hover:text-purple-300 transition">✉️ Email</a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Account */}
             <div>
               <h3 className="text-base font-semibold text-gray-200 mb-4">Account</h3>
@@ -1926,6 +2013,7 @@ function MerchantDashboardInner() {
           </>
         )
       })()}
+      </div>}
     </div>
   )
 }

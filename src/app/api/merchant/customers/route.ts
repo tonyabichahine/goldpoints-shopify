@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ...customer, history: history || [] })
   }
 
-  const { data } = await supabaseAdmin.from('customers').select('*').eq('merchant_id', merchantId).order('points', { ascending: false })
+  const { data } = await supabaseAdmin.from('customers').select('*').eq('merchant_id', merchantId).is('deleted_at', null).order('points', { ascending: false })
   return NextResponse.json(data || [])
 }
 
@@ -83,5 +83,17 @@ export async function PATCH(req: NextRequest) {
     await supabaseAdmin.from('customers').update(updates).eq('id', id).eq('merchant_id', merchantId)
   }
 
+  return NextResponse.json({ ok: true })
+}
+
+export async function DELETE(req: NextRequest) {
+  const merchantId = getMerchantId(req)
+  if (!merchantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+  await Promise.all([
+    supabaseAdmin.from('customers').update({ deleted_at: new Date().toISOString(), deleted_by_merchant_id: merchantId }).eq('id', id).eq('merchant_id', merchantId),
+    supabaseAdmin.from('automation_enrollments').update({ status: 'cancelled' }).eq('customer_id', id).eq('merchant_id', merchantId).eq('status', 'active'),
+  ])
   return NextResponse.json({ ok: true })
 }

@@ -21,6 +21,7 @@ interface Merchant {
   whatsapp_credits: number
   whatsapp_phone_number_id: string | null
   whatsapp_waba_id: string | null
+  trial_ends_at: string | null
 }
 
 interface DnsRecord {
@@ -171,6 +172,11 @@ export default function AdminPage() {
     setDomainStatus(d.status)
     setDomainMsg(d.status === 'verified' ? '✓ Domain verified! Emails will now send from this address.' : 'DNS not verified yet — check your records and try again.')
     setDomainLoading(false)
+    load()
+  }
+
+  async function markPaid(id: string) {
+    await fetch('/api/admin/merchants', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, mark_paid: true }) })
     load()
   }
 
@@ -421,6 +427,16 @@ export default function AdminPage() {
                         <button onClick={() => openSettings(m)} className="text-xs px-3 py-1 rounded-lg border border-yellow-500 text-yellow-400 hover:bg-yellow-500/10 transition">
                           Settings
                         </button>
+                        {m.trial_ends_at && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${new Date(m.trial_ends_at) < new Date() ? 'border-red-500/50 text-red-400 bg-red-900/20' : 'border-yellow-500/50 text-yellow-400 bg-yellow-900/20'}`}>
+                            {new Date(m.trial_ends_at) < new Date() ? '⚠ Expired' : `Trial: ${Math.ceil((new Date(m.trial_ends_at).getTime() - Date.now()) / 86400000)}d left`}
+                          </span>
+                        )}
+                        {m.trial_ends_at && (
+                          <button onClick={() => markPaid(m.id)} className="text-xs px-3 py-1 rounded-lg border border-green-500 text-green-400 hover:bg-green-500/10 transition">
+                            ✓ Mark Paid
+                          </button>
+                        )}
                         <button onClick={() => toggleMerchant(m.id, m.active)} className={`text-xs px-3 py-1 rounded-lg border transition ${m.active ? 'border-orange-500 text-orange-400 hover:bg-orange-500/10' : 'border-green-500 text-green-400 hover:bg-green-500/10'}`}>
                           {m.active ? 'Pause' : 'Activate'}
                         </button>

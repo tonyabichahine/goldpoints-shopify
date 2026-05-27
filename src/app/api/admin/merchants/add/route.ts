@@ -92,9 +92,11 @@ export async function POST(req: NextRequest) {
   const password_hash = await bcrypt.hash(password, 10)
   const domain = shopify_domain ? (shopify_domain.includes('.') ? shopify_domain : `${shopify_domain}.myshopify.com`) : null
 
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+
   const { data, error } = await supabaseAdmin
     .from('merchants')
-    .insert({ shopify_domain: domain, store_name, email: email.toLowerCase().trim(), password_hash, shopify_access_token: 'pending' })
+    .insert({ shopify_domain: domain, store_name, email: email.toLowerCase().trim(), password_hash, shopify_access_token: 'pending', trial_ends_at: trialEndsAt })
     .select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
 
         <a href="https://goldpoints-shopify.vercel.app" style="display:inline-block;background:linear-gradient(to right,#7c3aed,#6d28d9);color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:700;font-size:15px">Log In to Dashboard →</a>
 
-        <p style="color:#8080a0;font-size:12px;margin-top:32px;line-height:1.6">Once logged in, connect your Shopify store to activate the loyalty widget on your storefront.<br/>Need help? Reply to this email.</p>
+        <p style="color:#8080a0;font-size:12px;margin-top:32px;line-height:1.6">Your 14-day free trial starts today. Once logged in, connect your Shopify store to activate the loyalty widget on your storefront.<br/>Need help? Reply to this email or WhatsApp us at +961 71 552 479.</p>
       </div>
     `,
   })
