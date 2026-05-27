@@ -135,47 +135,47 @@
   }
 
   const COUNTRIES = [
-    {c:'INTL',f:'🌍',d:'',n:'International'},
-    {c:'US',f:'🇺🇸',d:'+1',n:'United States'},
-    {c:'GB',f:'🇬🇧',d:'+44',n:'United Kingdom'},
-    {c:'CA',f:'🇨🇦',d:'+1',n:'Canada'},
-    {c:'AU',f:'🇦🇺',d:'+61',n:'Australia'},
-    {c:'LB',f:'🇱🇧',d:'+961',n:'Lebanon'},
-    {c:'AE',f:'🇦🇪',d:'+971',n:'UAE'},
-    {c:'SA',f:'🇸🇦',d:'+966',n:'Saudi Arabia'},
-    {c:'KW',f:'🇰🇼',d:'+965',n:'Kuwait'},
-    {c:'QA',f:'🇶🇦',d:'+974',n:'Qatar'},
-    {c:'BH',f:'🇧🇭',d:'+973',n:'Bahrain'},
-    {c:'OM',f:'🇴🇲',d:'+968',n:'Oman'},
-    {c:'JO',f:'🇯🇴',d:'+962',n:'Jordan'},
-    {c:'EG',f:'🇪🇬',d:'+20',n:'Egypt'},
-    {c:'IQ',f:'🇮🇶',d:'+964',n:'Iraq'},
-    {c:'TR',f:'🇹🇷',d:'+90',n:'Turkey'},
-    {c:'MA',f:'🇲🇦',d:'+212',n:'Morocco'},
-    {c:'TN',f:'🇹🇳',d:'+216',n:'Tunisia'},
-    {c:'DZ',f:'🇩🇿',d:'+213',n:'Algeria'},
-    {c:'DE',f:'🇩🇪',d:'+49',n:'Germany'},
-    {c:'FR',f:'🇫🇷',d:'+33',n:'France'},
-    {c:'IT',f:'🇮🇹',d:'+39',n:'Italy'},
-    {c:'ES',f:'🇪🇸',d:'+34',n:'Spain'},
-    {c:'NL',f:'🇳🇱',d:'+31',n:'Netherlands'},
-    {c:'SE',f:'🇸🇪',d:'+46',n:'Sweden'},
-    {c:'NO',f:'🇳🇴',d:'+47',n:'Norway'},
-    {c:'CH',f:'🇨🇭',d:'+41',n:'Switzerland'},
-    {c:'PL',f:'🇵🇱',d:'+48',n:'Poland'},
-    {c:'IN',f:'🇮🇳',d:'+91',n:'India'},
-    {c:'PK',f:'🇵🇰',d:'+92',n:'Pakistan'},
-    {c:'NG',f:'🇳🇬',d:'+234',n:'Nigeria'},
-    {c:'ZA',f:'🇿🇦',d:'+27',n:'South Africa'},
-    {c:'BR',f:'🇧🇷',d:'+55',n:'Brazil'},
-    {c:'MX',f:'🇲🇽',d:'+52',n:'Mexico'},
-    {c:'SG',f:'🇸🇬',d:'+65',n:'Singapore'},
-    {c:'MY',f:'🇲🇾',d:'+60',n:'Malaysia'},
-    {c:'PH',f:'🇵🇭',d:'+63',n:'Philippines'},
-    {c:'JP',f:'🇯🇵',d:'+81',n:'Japan'},
-    {c:'KR',f:'🇰🇷',d:'+82',n:'South Korea'},
-    {c:'HK',f:'🇭🇰',d:'+852',n:'Hong Kong'},
-    {c:'NZ',f:'🇳🇿',d:'+64',n:'New Zealand'},
+    {c:'INTL',f:'🌍',d:'',    n:'International',  m:6,  x:15},
+    {c:'US',  f:'🇺🇸',d:'+1', n:'United States',  m:10, x:11},
+    {c:'GB',  f:'🇬🇧',d:'+44',n:'United Kingdom',  m:10, x:11},
+    {c:'CA',  f:'🇨🇦',d:'+1', n:'Canada',          m:10, x:11},
+    {c:'AU',  f:'🇦🇺',d:'+61',n:'Australia',       m:9,  x:10},
+    {c:'LB',  f:'🇱🇧',d:'+961',n:'Lebanon',        m:7,  x:9},
+    {c:'AE',  f:'🇦🇪',d:'+971',n:'UAE',            m:9,  x:9},
+    {c:'SA',  f:'🇸🇦',d:'+966',n:'Saudi Arabia',   m:9,  x:9},
+    {c:'KW',  f:'🇰🇼',d:'+965',n:'Kuwait',         m:8,  x:8},
+    {c:'QA',  f:'🇶🇦',d:'+974',n:'Qatar',          m:8,  x:8},
+    {c:'BH',  f:'🇧🇭',d:'+973',n:'Bahrain',        m:8,  x:8},
+    {c:'OM',  f:'🇴🇲',d:'+968',n:'Oman',           m:8,  x:8},
+    {c:'JO',  f:'🇯🇴',d:'+962',n:'Jordan',         m:9,  x:9},
+    {c:'EG',  f:'🇪🇬',d:'+20', n:'Egypt',          m:10, x:11},
+    {c:'IQ',  f:'🇮🇶',d:'+964',n:'Iraq',           m:10, x:11},
+    {c:'TR',  f:'🇹🇷',d:'+90', n:'Turkey',         m:10, x:11},
+    {c:'MA',  f:'🇲🇦',d:'+212',n:'Morocco',        m:9,  x:10},
+    {c:'TN',  f:'🇹🇳',d:'+216',n:'Tunisia',        m:8,  x:8},
+    {c:'DZ',  f:'🇩🇿',d:'+213',n:'Algeria',        m:9,  x:10},
+    {c:'DE',  f:'🇩🇪',d:'+49', n:'Germany',        m:10, x:12},
+    {c:'FR',  f:'🇫🇷',d:'+33', n:'France',         m:9,  x:10},
+    {c:'IT',  f:'🇮🇹',d:'+39', n:'Italy',          m:9,  x:11},
+    {c:'ES',  f:'🇪🇸',d:'+34', n:'Spain',          m:9,  x:9},
+    {c:'NL',  f:'🇳🇱',d:'+31', n:'Netherlands',    m:9,  x:10},
+    {c:'SE',  f:'🇸🇪',d:'+46', n:'Sweden',         m:9,  x:10},
+    {c:'NO',  f:'🇳🇴',d:'+47', n:'Norway',         m:8,  x:8},
+    {c:'CH',  f:'🇨🇭',d:'+41', n:'Switzerland',    m:9,  x:9},
+    {c:'PL',  f:'🇵🇱',d:'+48', n:'Poland',         m:9,  x:9},
+    {c:'IN',  f:'🇮🇳',d:'+91', n:'India',          m:10, x:10},
+    {c:'PK',  f:'🇵🇰',d:'+92', n:'Pakistan',       m:10, x:11},
+    {c:'NG',  f:'🇳🇬',d:'+234',n:'Nigeria',        m:10, x:11},
+    {c:'ZA',  f:'🇿🇦',d:'+27', n:'South Africa',   m:9,  x:10},
+    {c:'BR',  f:'🇧🇷',d:'+55', n:'Brazil',         m:10, x:11},
+    {c:'MX',  f:'🇲🇽',d:'+52', n:'Mexico',         m:10, x:10},
+    {c:'SG',  f:'🇸🇬',d:'+65', n:'Singapore',      m:8,  x:8},
+    {c:'MY',  f:'🇲🇾',d:'+60', n:'Malaysia',       m:9,  x:10},
+    {c:'PH',  f:'🇵🇭',d:'+63', n:'Philippines',    m:10, x:10},
+    {c:'JP',  f:'🇯🇵',d:'+81', n:'Japan',          m:10, x:11},
+    {c:'KR',  f:'🇰🇷',d:'+82', n:'South Korea',    m:10, x:11},
+    {c:'HK',  f:'🇭🇰',d:'+852',n:'Hong Kong',      m:8,  x:8},
+    {c:'NZ',  f:'🇳🇿',d:'+64', n:'New Zealand',    m:8,  x:9},
   ]
 
   function getCountry() {
@@ -267,6 +267,30 @@
       return val.startsWith('+') ? val : `${d}${val}`
     }
     return val.startsWith('+') ? val : `${ctry.d}${val}`
+  }
+
+  function validatePhone(phoneId, countrySelectId) {
+    const phoneEl = document.getElementById(phoneId)
+    const raw = phoneEl ? phoneEl.value.trim() : ''
+    if (!raw) return null
+    const digits = raw.replace(/\D/g, '').replace(/^0+/, '')
+    const ctry = getCountry()
+    const isIntl = !ctry || ctry.c === 'INTL'
+    let entry
+    if (isIntl) {
+      const b = document.getElementById(countrySelectId + '-btn')
+      entry = b ? COUNTRIES.find(x => x.c === b.dataset.code) : null
+    } else {
+      entry = ctry
+    }
+    if (!entry || entry.c === 'INTL') {
+      return (digits.length < 6 || digits.length > 15) ? 'Please enter a valid phone number.' : null
+    }
+    if (digits.length < entry.m || digits.length > entry.x) {
+      const expected = entry.m === entry.x ? `${entry.m}` : `${entry.m}–${entry.x}`
+      return `${entry.n} numbers should be ${expected} digits.`
+    }
+    return null
   }
 
   function tierInfo(lifetimePts) {
@@ -702,6 +726,7 @@
         const phone = readPhone('gp-profile-phone','gp-profile-country')
         const msg = document.getElementById('gp-profile-msg')
         if (config && config.widget_phone_required && !phone) { msg.textContent='Phone number is required.'; msg.style.color='#e74c3c'; return }
+        if (phone) { const pe=validatePhone('gp-profile-phone','gp-profile-country'); if (pe) { msg.textContent=pe; msg.style.color='#e74c3c'; return } }
         msg.textContent='Saving...'; msg.style.color='#7878a0'
         const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email:CUSTOMER_EMAIL,name,birthday,marketing_consent,whatsapp_consent,phone,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
@@ -736,6 +761,7 @@
         const msg = document.getElementById('gp-reg-msg')
         if (!name || !email || !password) { msg.textContent='All fields are required.'; msg.style.color='#e74c3c'; return }
         if (config && config.widget_phone_required && !phone) { msg.textContent='Phone number is required.'; msg.style.color='#e74c3c'; return }
+        if (phone) { const pe=validatePhone('gp-reg-phone','gp-reg-country'); if (pe) { msg.textContent=pe; msg.style.color='#e74c3c'; return } }
         msg.textContent='Creating account...'; msg.style.color='#7878a0'
         const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name,password,phone,whatsapp_consent,gp_ref:GP_REF})})
         if (data.error) { msg.textContent=data.error; msg.style.color='#e74c3c'; return }
@@ -827,6 +853,7 @@
           const whatsapp_consent = document.getElementById('gp-edit-whatsapp').checked
           const phone = readPhone('gp-edit-phone','gp-edit-country')
           const msg = document.getElementById('gp-edit-msg')
+          if (phone) { const pe=validatePhone('gp-edit-phone','gp-edit-country'); if (pe) { msg.textContent=pe; msg.style.color='#e74c3c'; return } }
           msg.textContent='Saving...'; msg.style.color='#7878a0'
           const email = (customer&&customer.email)||CUSTOMER_EMAIL||localStorage.getItem(STORAGE_KEY)
           const data = await api('/api/widget/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shop:SHOP,email,name:customer.name,birthday,marketing_consent,whatsapp_consent,phone})})
