@@ -1,3 +1,35 @@
+import { supabaseAdmin } from './supabase'
+
+export async function sendWhatsAppPoints(
+  merchantId: string,
+  customerPhone: string,
+  customerName: string,
+  points: number,
+  storeName: string
+) {
+  if (!customerPhone) return
+  try {
+    const { data: merchant } = await supabaseAdmin
+      .from('merchants')
+      .select('whatsapp_token, whatsapp_phone_number_id')
+      .eq('id', merchantId)
+      .single()
+    if (!merchant?.whatsapp_token || !merchant?.whatsapp_phone_number_id) return
+
+    const { data: template } = await supabaseAdmin
+      .from('whatsapp_templates')
+      .select('name')
+      .eq('merchant_id', merchantId)
+      .eq('status', 'APPROVED')
+      .limit(1)
+      .single()
+    if (!template) return
+
+    const firstName = (customerName || '').split(' ')[0] || customerName
+    await sendWhatsApp(customerPhone, template.name, [firstName, storeName, String(points)], merchant.whatsapp_phone_number_id, merchant.whatsapp_token)
+  } catch {}
+}
+
 export async function sendWhatsApp(
   to: string,
   templateName: string,

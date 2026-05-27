@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData, SHOPIFY_API_SECRET, tagShopifyCustomer } from '@/lib/shopify'
 import { fireAutomation, enrollInFlows } from '@/lib/email'
+import { sendWhatsAppPoints } from '@/lib/whatsapp'
 import crypto from 'crypto'
 
 async function awardCampaignBonus(campaignId: string, merchantId: string, customerId: string, currentPoints: number) {
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   const { data: customer } = await supabaseAdmin
     .from('customers')
-    .select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded, shopify_customer_id, name, email')
+    .select('id, points, tier, lifetime_points, silver_bonus_awarded, gold_bonus_awarded, shopify_customer_id, name, email, phone, whatsapp_consent')
     .eq('merchant_id', merchant.id).eq('email', customerEmail).single()
   if (!customer) return NextResponse.json({ ok: true })
 
@@ -91,6 +92,10 @@ export async function POST(req: NextRequest) {
 
   if (effectiveShopifyId) {
     tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(() => {})
+  }
+
+  if (customer.whatsapp_consent && customer.phone) {
+    sendWhatsAppPoints(merchant.id, customer.phone, customer.name || customerEmail, newPoints, merchant.store_name || '').catch(() => {})
   }
 
   // Campaign attribution: click-based first (stronger), then send-based fallback

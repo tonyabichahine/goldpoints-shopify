@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
 import { fireAutomation, enrollInFlows } from '@/lib/email'
+import { sendWhatsAppPoints } from '@/lib/whatsapp'
 import bcrypt from 'bcryptjs'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
@@ -99,6 +100,9 @@ export async function POST(req: NextRequest) {
 
   fireAutomation(merchant.id, 'signup', { email: email.toLowerCase().trim(), name: name || email, points: customer.points, tier: customer.tier }, merchant.store_name || '').catch(() => {})
   enrollInFlows(merchant.id, customer.id, 'signup').catch(() => {})
+  if (whatsapp_consent && phone) {
+    sendWhatsAppPoints(merchant.id, phone, name || email, customer.points, merchant.store_name || '').catch(() => {})
+  }
 
   return NextResponse.json({ customer, isNew: true }, { headers: cors })
 }
