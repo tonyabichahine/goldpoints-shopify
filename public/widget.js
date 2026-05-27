@@ -97,9 +97,20 @@
     .gp-field-label{font-size:.78rem;color:#7878a0;display:block;margin-bottom:4px}
     .gp-logout{font-size:.75rem;color:#5050a0;background:none;border:none;cursor:pointer;margin-top:8px;text-decoration:underline;display:block}
     .gp-copy-toast{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#fff;font-size:.72rem;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none}
-    .gp-phone-wrap{display:flex;margin-bottom:10px}
-    .gp-phone-cc{background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-right:none;border-radius:10px 0 0 10px;padding:10px 8px;color:#e0e0f0;font-size:.82rem;outline:none;cursor:pointer;-webkit-appearance:auto;appearance:auto;flex-shrink:0;max-width:130px}
-    .gp-phone-cc option{background:#1a1a2e;color:#e0e0f0}
+    .gp-phone-wrap{display:flex;margin-bottom:10px;position:relative}
+    .gp-cc-picker{position:relative;flex-shrink:0}
+    .gp-cc-btn{background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-right:none;border-radius:10px 0 0 10px;padding:0 10px;height:42px;color:#e0e0f0;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:.85rem;font-weight:600}
+    .gp-cc-btn:hover{background:#1a1a2e}
+    .gp-cc-flag{width:18px;height:13px;border-radius:2px;object-fit:cover;flex-shrink:0}
+    .gp-cc-arrow{font-size:.65rem;opacity:.5;margin-left:1px}
+    .gp-cc-drop{position:absolute;top:calc(100% + 4px);left:0;background:#1a1a2e;border:1px solid rgba(255,255,255,.18);border-radius:12px;z-index:2147483647;width:260px;box-shadow:0 12px 32px rgba(0,0,0,.7);overflow:hidden}
+    .gp-cc-search{width:100%;background:#0f0f1a;border:none;border-bottom:1px solid rgba(255,255,255,.1);padding:10px 14px;color:#e0e0f0;font-size:.85rem;outline:none;box-sizing:border-box}
+    .gp-cc-search::placeholder{color:#606080}
+    .gp-cc-list{max-height:210px;overflow-y:auto}
+    .gp-cc-opt{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;color:#e0e0f0;font-size:.83rem;transition:background .12s}
+    .gp-cc-opt:hover{background:rgba(255,255,255,.07)}
+    .gp-cc-opt-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .gp-cc-opt-dial{font-size:.75rem;opacity:.55;flex-shrink:0}
     .gp-phone-num2{flex:1;background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:0 10px 10px 0;padding:10px 12px;color:#e0e0f0;font-size:.9rem;outline:none;min-width:0}
   `
   document.head.appendChild(style)
@@ -178,15 +189,70 @@
     const ctry = getCountry()
     const isIntl = !ctry || ctry.c === 'INTL'
     if (isIntl) {
-      const opts = COUNTRIES.filter(x => x.c !== 'INTL').map(x => `<option value="${x.c}">${x.c} ${x.d} — ${x.n}</option>`).join('')
       return `<label class="gp-field-label">${label}</label>
         <div class="gp-phone-wrap">
-          <select class="gp-phone-cc" id="${countrySelectId}">${opts}</select>
+          <div class="gp-cc-picker" id="${countrySelectId}-wrap">
+            <button type="button" class="gp-cc-btn" id="${countrySelectId}-btn" data-code="US" data-dial="+1">
+              <img class="gp-cc-flag" id="${countrySelectId}-flag" src="https://flagcdn.com/16x12/us.png" />
+              <span class="gp-cc-dial" id="${countrySelectId}-dial">+1</span>
+              <span class="gp-cc-arrow">▾</span>
+            </button>
+            <div class="gp-cc-drop" id="${countrySelectId}-drop" style="display:none">
+              <input class="gp-cc-search" id="${countrySelectId}-search" type="text" placeholder="Search country..." autocomplete="off" />
+              <div class="gp-cc-list" id="${countrySelectId}-list"></div>
+            </div>
+          </div>
           <input class="gp-phone-num2" id="${phoneId}" type="tel" placeholder="555 000 000" />
         </div>`
     }
-    return `<label class="gp-field-label">${label} <span style="opacity:.6">${ctry.c} ${ctry.d}</span></label>
+    return `<label class="gp-field-label">${label} <span style="opacity:.6"><img src="https://flagcdn.com/16x12/${ctry.c.toLowerCase()}.png" style="width:16px;height:12px;border-radius:2px;vertical-align:middle;margin-right:3px">${ctry.d}</span></label>
       <input class="gp-input" id="${phoneId}" type="tel" placeholder="71 123 456" />`
+  }
+
+  function bindPhonePicker(countrySelectId) {
+    const btn  = document.getElementById(countrySelectId + '-btn')
+    const drop = document.getElementById(countrySelectId + '-drop')
+    const list = document.getElementById(countrySelectId + '-list')
+    const srch = document.getElementById(countrySelectId + '-search')
+    const flag = document.getElementById(countrySelectId + '-flag')
+    const dial = document.getElementById(countrySelectId + '-dial')
+    if (!btn || !drop) return
+
+    function renderOpts(filter) {
+      const f = (filter || '').toLowerCase()
+      const items = COUNTRIES.filter(x => x.c !== 'INTL' && (!f || x.n.toLowerCase().includes(f) || x.d.includes(f) || x.c.toLowerCase().includes(f)))
+      list.innerHTML = items.map(x =>
+        `<div class="gp-cc-opt" data-code="${x.c}" data-dial="${x.d}">
+          <img class="gp-cc-flag" src="https://flagcdn.com/16x12/${x.c.toLowerCase()}.png" onerror="this.style.visibility='hidden'" />
+          <span class="gp-cc-opt-name">${x.n}</span>
+          <span class="gp-cc-opt-dial">${x.d}</span>
+        </div>`
+      ).join('')
+      list.querySelectorAll('.gp-cc-opt').forEach(el => {
+        el.addEventListener('mousedown', e => {
+          e.preventDefault()
+          btn.dataset.code = el.dataset.code
+          btn.dataset.dial = el.dataset.dial
+          flag.src = `https://flagcdn.com/16x12/${el.dataset.code.toLowerCase()}.png`
+          dial.textContent = el.dataset.dial
+          drop.style.display = 'none'
+        })
+      })
+    }
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const open = drop.style.display !== 'none'
+      drop.style.display = open ? 'none' : 'block'
+      if (!open) { renderOpts(''); if (srch) { srch.value = ''; srch.focus() } }
+    })
+    if (srch) srch.addEventListener('input', () => renderOpts(srch.value))
+
+    function outsideClick(e) {
+      const wrap = document.getElementById(countrySelectId + '-wrap')
+      if (wrap && !wrap.contains(e.target)) { drop.style.display = 'none' }
+    }
+    document.addEventListener('click', outsideClick)
   }
 
   function readPhone(phoneId, countrySelectId) {
@@ -196,10 +262,9 @@
     const ctry = getCountry()
     const isIntl = !ctry || ctry.c === 'INTL'
     if (isIntl) {
-      const sel = document.getElementById(countrySelectId)
-      const chosen = sel ? COUNTRIES.find(x => x.c === sel.value) : null
-      const dial = chosen ? chosen.d : ''
-      return val.startsWith('+') ? val : `${dial}${val}`
+      const btn = document.getElementById(countrySelectId + '-btn')
+      const d = btn ? (btn.dataset.dial || '+1') : '+1'
+      return val.startsWith('+') ? val : `${d}${val}`
     }
     return val.startsWith('+') ? val : `${ctry.d}${val}`
   }
@@ -628,6 +693,7 @@
     }
 
     if (v === 'profile') {
+      bindPhonePicker('gp-profile-country')
       document.getElementById('gp-profile-save').addEventListener('click', async () => {
         const name = CUSTOMER_NAME || document.getElementById('gp-profile-name').value.trim()
         const birthday = document.getElementById('gp-profile-birthday').value
@@ -660,6 +726,7 @@
     }
 
     if (v === 'register-form') {
+      bindPhonePicker('gp-reg-country')
       document.getElementById('gp-reg-submit').addEventListener('click', async () => {
         const name = document.getElementById('gp-reg-name').value.trim()
         const email = document.getElementById('gp-reg-email').value.trim()
@@ -704,6 +771,7 @@
     }
 
     if (v === 'home' && customer) {
+      bindPhonePicker('gp-edit-country')
       // Copy referral link
       const copyBtn = document.getElementById('gp-copy-ref')
       if (copyBtn) {
