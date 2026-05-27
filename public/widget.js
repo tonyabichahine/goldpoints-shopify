@@ -140,7 +140,7 @@
     {c:'GB',  f:'🇬🇧',d:'+44',n:'United Kingdom',  m:10, x:11},
     {c:'CA',  f:'🇨🇦',d:'+1', n:'Canada',          m:10, x:11},
     {c:'AU',  f:'🇦🇺',d:'+61',n:'Australia',       m:9,  x:10},
-    {c:'LB',  f:'🇱🇧',d:'+961',n:'Lebanon',        m:7,  x:9},
+    {c:'LB',  f:'🇱🇧',d:'+961',n:'Lebanon',        m:8,  x:8},
     {c:'AE',  f:'🇦🇪',d:'+971',n:'UAE',            m:9,  x:9},
     {c:'SA',  f:'🇸🇦',d:'+966',n:'Saudi Arabia',   m:9,  x:9},
     {c:'KW',  f:'🇰🇼',d:'+965',n:'Kuwait',         m:8,  x:8},
