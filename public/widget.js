@@ -97,8 +97,10 @@
     .gp-field-label{font-size:.78rem;color:#7878a0;display:block;margin-bottom:4px}
     .gp-logout{font-size:.75rem;color:#5050a0;background:none;border:none;cursor:pointer;margin-top:8px;text-decoration:underline;display:block}
     .gp-copy-toast{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#fff;font-size:.72rem;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none}
-    .gp-phone-select{width:100%;background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;color:#e0e0f0;font-size:.9rem;outline:none;box-sizing:border-box;margin-bottom:10px;-webkit-appearance:auto;appearance:auto;cursor:pointer}
-    .gp-phone-select option{background:#1a1a2e;color:#e0e0f0}
+    .gp-phone-wrap{display:flex;margin-bottom:10px}
+    .gp-phone-cc{background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-right:none;border-radius:10px 0 0 10px;padding:10px 8px;color:#e0e0f0;font-size:.82rem;outline:none;cursor:pointer;-webkit-appearance:auto;appearance:auto;flex-shrink:0;max-width:130px}
+    .gp-phone-cc option{background:#1a1a2e;color:#e0e0f0}
+    .gp-phone-num2{flex:1;background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:0 10px 10px 0;padding:10px 12px;color:#e0e0f0;font-size:.9rem;outline:none;min-width:0}
   `
   document.head.appendChild(style)
 
@@ -176,13 +178,14 @@
     const ctry = getCountry()
     const isIntl = !ctry || ctry.c === 'INTL'
     if (isIntl) {
-      const opts = COUNTRIES.filter(x => x.c !== 'INTL').map(x => `<option value="${x.c}">${x.f} ${x.d} — ${x.n}</option>`).join('')
-      return `<label class="gp-field-label">Country</label>
-        <select class="gp-phone-select" id="${countrySelectId}">${opts}</select>
-        <label class="gp-field-label">${label}</label>
-        <input class="gp-input" id="${phoneId}" type="tel" placeholder="555 000 000" />`
+      const opts = COUNTRIES.filter(x => x.c !== 'INTL').map(x => `<option value="${x.c}">${x.c} ${x.d} — ${x.n}</option>`).join('')
+      return `<label class="gp-field-label">${label}</label>
+        <div class="gp-phone-wrap">
+          <select class="gp-phone-cc" id="${countrySelectId}">${opts}</select>
+          <input class="gp-phone-num2" id="${phoneId}" type="tel" placeholder="555 000 000" />
+        </div>`
     }
-    return `<label class="gp-field-label">${label} <span style="opacity:.6">${ctry.f} ${ctry.d}</span></label>
+    return `<label class="gp-field-label">${label} <span style="opacity:.6">${ctry.c} ${ctry.d}</span></label>
       <input class="gp-input" id="${phoneId}" type="tel" placeholder="71 123 456" />`
   }
 
