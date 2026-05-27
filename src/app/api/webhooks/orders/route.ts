@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants')
-    .select('id, store_name, shopify_access_token, points_per_dollar, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, attribution_window_days')
+    .select('id, store_name, shopify_access_token, points_per_dollar, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, attribution_window_days, whatsapp_auto_notify')
     .eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ ok: true })
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(() => {})
   }
 
-  if (customer.whatsapp_consent && customer.phone) {
+  if (merchant.whatsapp_auto_notify && customer.whatsapp_consent && customer.phone) {
     sendWhatsAppPoints(merchant.id, customer.phone, customer.name || customerEmail, newPoints, merchant.store_name || '').catch(() => {})
   }
 

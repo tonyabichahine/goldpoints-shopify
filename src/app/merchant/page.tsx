@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null; whatsapp_auto_notify: boolean }
 interface WaTemplate { id: string; name: string; category: string; body: string; status: string; rejection_reason: string | null; created_at: string }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
@@ -1174,6 +1174,24 @@ function MerchantDashboardInner() {
 
             {merchant.whatsapp_waba_id && (
               <>
+                {/* Auto-notify toggle */}
+                <div className="bg-[#16162a] border border-white/10 rounded-xl p-5 flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-white text-sm">Automatic Points Notifications</div>
+                    <div className="text-xs text-gray-400 mt-1">Send a WhatsApp message to customers after every order and on signup. Uses your approved template. <span className="text-yellow-400">Each message is charged by Meta.</span></div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const next = !merchant.whatsapp_auto_notify
+                      await fetch('/api/merchant/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ whatsapp_auto_notify: next }) })
+                      setMerchant(m => m ? { ...m, whatsapp_auto_notify: next } : m)
+                    }}
+                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${merchant.whatsapp_auto_notify ? 'bg-green-500' : 'bg-white/10'}`}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${merchant.whatsapp_auto_notify ? 'left-5' : 'left-0.5'}`} />
+                  </button>
+                </div>
+
                 {/* Existing templates */}
                 {waLoading ? (
                   <p className="text-sm text-gray-500">Loading templates…</p>

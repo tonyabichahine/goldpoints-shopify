@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
   const { data: merchant } = await supabaseAdmin
-    .from('merchants').select('id, store_name, signup_bonus, referral_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus').eq('shopify_domain', shop).single()
+    .from('merchants').select('id, store_name, signup_bonus, referral_points, tier_silver, tier_gold, tier_silver_bonus, tier_gold_bonus, whatsapp_auto_notify').eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
 
   const { data: existing } = await supabaseAdmin
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
   fireAutomation(merchant.id, 'signup', { email: email.toLowerCase().trim(), name: name || email, points: customer.points, tier: customer.tier }, merchant.store_name || '').catch(() => {})
   enrollInFlows(merchant.id, customer.id, 'signup').catch(() => {})
-  if (whatsapp_consent && phone) {
+  if (merchant.whatsapp_auto_notify && whatsapp_consent && phone) {
     sendWhatsAppPoints(merchant.id, phone, name || email, customer.points, merchant.store_name || '').catch(() => {})
   }
 
