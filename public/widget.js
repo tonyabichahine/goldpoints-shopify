@@ -97,11 +97,8 @@
     .gp-field-label{font-size:.78rem;color:#7878a0;display:block;margin-bottom:4px}
     .gp-logout{font-size:.75rem;color:#5050a0;background:none;border:none;cursor:pointer;margin-top:8px;text-decoration:underline;display:block}
     .gp-copy-toast{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#fff;font-size:.72rem;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none}
-    .gp-phone-box{display:flex;align-items:center;background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:10px;margin-bottom:10px;overflow:hidden}
-    .gp-phone-flag-select{background:transparent;border:none;border-right:1px solid rgba(255,255,255,.12);color:#e0e0f0;font-size:.82rem;padding:10px 8px;outline:none;cursor:pointer;flex-shrink:0;max-width:140px}
-    .gp-phone-flag-select option{background:#1a1a2e;color:#e0e0f0}
-    .gp-phone-flag-static{color:#e0e0f0;font-size:.82rem;padding:10px 10px;border-right:1px solid rgba(255,255,255,.12);white-space:nowrap;flex-shrink:0}
-    .gp-phone-num{flex:1;background:transparent;border:none;color:#e0e0f0;font-size:.9rem;padding:10px 12px;outline:none}
+    .gp-phone-select{width:100%;background:#0f0f1a;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;color:#e0e0f0;font-size:.9rem;outline:none;box-sizing:border-box;margin-bottom:10px;-webkit-appearance:auto;appearance:auto;cursor:pointer}
+    .gp-phone-select option{background:#1a1a2e;color:#e0e0f0}
   `
   document.head.appendChild(style)
 
@@ -180,17 +177,13 @@
     const isIntl = !ctry || ctry.c === 'INTL'
     if (isIntl) {
       const opts = COUNTRIES.filter(x => x.c !== 'INTL').map(x => `<option value="${x.c}">${x.f} ${x.d} — ${x.n}</option>`).join('')
-      return `<label class="gp-field-label">${label}</label>
-        <div class="gp-phone-box">
-          <select class="gp-phone-flag-select" id="${countrySelectId}">${opts}</select>
-          <input class="gp-phone-num" id="${phoneId}" type="tel" placeholder="555 000 000" />
-        </div>`
+      return `<label class="gp-field-label">Country</label>
+        <select class="gp-phone-select" id="${countrySelectId}">${opts}</select>
+        <label class="gp-field-label">${label}</label>
+        <input class="gp-input" id="${phoneId}" type="tel" placeholder="555 000 000" />`
     }
-    return `<label class="gp-field-label">${label}</label>
-      <div class="gp-phone-box">
-        <span class="gp-phone-flag-static">${ctry.f} ${ctry.d}</span>
-        <input class="gp-phone-num" id="${phoneId}" type="tel" placeholder="71 123 456" />
-      </div>`
+    return `<label class="gp-field-label">${label} <span style="opacity:.6">${ctry.f} ${ctry.d}</span></label>
+      <input class="gp-input" id="${phoneId}" type="tel" placeholder="71 123 456" />`
   }
 
   function readPhone(phoneId, countrySelectId) {
