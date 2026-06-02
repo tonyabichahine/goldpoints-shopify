@@ -329,8 +329,28 @@
     const tcStyle = document.createElement('style'); tcStyle.id='gp-tc-style'
     tcStyle.textContent = `.gp-btn-main{color:${tc}!important}`
     document.head.appendChild(tcStyle)
-    const label = document.getElementById('gp-btn-label')
-    if (label) label.textContent = config.widget_title || 'Rewards'
+    function applyLabel() {
+      const lbl = document.getElementById('gp-btn-label')
+      if (!lbl) return
+      const isMobile = window.innerWidth < 768
+      const mTitle = config.widget_mobile_title
+      if (isMobile && mTitle !== null && mTitle !== undefined) {
+        if (mTitle === '') {
+          lbl.style.display = 'none'
+          btn.style.width = '52px'
+          btn.style.padding = '0'
+          btn.style.justifyContent = 'center'
+        } else {
+          lbl.style.display = ''; lbl.textContent = mTitle
+          btn.style.width = ''; btn.style.padding = ''; btn.style.justifyContent = ''
+        }
+      } else {
+        lbl.style.display = ''; lbl.textContent = config.widget_title || 'Rewards'
+        btn.style.width = ''; btn.style.padding = ''; btn.style.justifyContent = ''
+      }
+    }
+    applyLabel()
+    window.addEventListener('resize', applyLabel)
     // Apply position + offsets
     const pos = config.widget_position || 'bottom-right'
     const ob = config.widget_offset_bottom ?? 24
@@ -346,6 +366,7 @@
     panel.style.right  = isLeft ? 'auto' : `${os}px`
     panel.style.left   = isLeft ? `${os}px` : 'auto'
     if (config.widget_bg_color) panel.style.background = config.widget_bg_color
+    if (config.widget_hidden) { return }
     btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'
 
     if (CUSTOMER_EMAIL) {

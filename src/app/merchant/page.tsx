@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null; whatsapp_auto_notify: boolean; trial_ends_at: string | null }
+interface Merchant { id: string; store_name: string; shopify_domain: string; shopify_access_token: string; email: string; widget_primary_color: string; widget_gradient_color: string; widget_btn_text_color: string; widget_bg_color: string; widget_title: string; widget_mobile_title: string | null; widget_hidden: boolean; widget_position: string; widget_offset_bottom: number; widget_offset_side: number; widget_store_country: string; widget_phone_required: boolean; points_per_dollar: number; signup_bonus: number; social_follow_url: string; follow_points: number; referral_points: number; tier_silver: number; tier_gold: number; tier_bronze_multiplier: number; tier_silver_multiplier: number; tier_gold_multiplier: number; tier_silver_bonus: number; tier_gold_bonus: number; whatsapp_credits: number; is_premium: boolean; whatsapp_waba_id: string | null; whatsapp_auto_notify: boolean; trial_ends_at: string | null }
 interface WaTemplate { id: string; name: string; category: string; body: string; status: string; rejection_reason: string | null; created_at: string }
 interface Stats { customers: number; total_points: number; gold: number; silver: number; bronze: number }
 interface Campaign { id: string; name: string; subject: string; body: string; segment: string; recipient_count: number; created_at: string; sent_at: string; attributed_orders: number; attributed_revenue: number; link_clicks: number; revenue_per_email: number; open_count: number; open_rate: number }
@@ -1363,7 +1363,22 @@ function MerchantDashboardInner() {
             <div>
               <h3 className="text-base font-semibold text-gray-200 mb-4">Widget</h3>
               <div className="bg-[#16162a] border border-white/10 rounded-xl p-6 space-y-4">
-                <div><label className="block text-sm text-gray-400 mb-1">Widget Title</label><input value={merchant.widget_title || ''} onChange={e => setMerchant(p => p ? {...p, widget_title: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
+                {/* Hide Widget */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-300 font-semibold">Hide Widget</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Widget will not appear on your store</p>
+                  </div>
+                  <button onClick={() => setMerchant(p => p ? {...p, widget_hidden: !p.widget_hidden} : p)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${merchant.widget_hidden ? 'bg-red-600' : 'bg-white/10'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${merchant.widget_hidden ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div><label className="block text-sm text-gray-400 mb-1">Widget Title (Desktop)</label><input value={merchant.widget_title || ''} onChange={e => setMerchant(p => p ? {...p, widget_title: e.target.value} : p)} className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" /></div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Widget Title (Mobile)</label>
+                  <input value={merchant.widget_mobile_title ?? ''} onChange={e => setMerchant(p => p ? {...p, widget_mobile_title: e.target.value} : p)} placeholder="Leave blank for icon only on mobile" className="bg-[#0f0f1a] border border-white/10 rounded-lg px-3 py-2 text-sm w-full" />
+                  <p className="text-xs text-gray-500 mt-1">Empty = only the 🎁 icon shows on mobile screens</p>
+                </div>
 
                 {/* Colors */}
                 <div>
@@ -1397,7 +1412,7 @@ function MerchantDashboardInner() {
                     </div>
                     {/* Live preview */}
                     <div>
-                      <span className="text-xs text-gray-500 block mb-1">Preview</span>
+                      <span className="text-xs text-gray-500 block mb-1">Desktop</span>
                       <div className="h-10 px-4 rounded-full flex items-center gap-2 text-sm font-bold shadow-lg" style={{
                         background: merchant.widget_gradient_color
                           ? `linear-gradient(135deg, ${merchant.widget_primary_color || '#6c3fff'}, ${merchant.widget_gradient_color})`
@@ -1405,6 +1420,18 @@ function MerchantDashboardInner() {
                         color: merchant.widget_btn_text_color || '#ffffff'
                       }}>
                         🎁 {merchant.widget_title || 'Rewards'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-1">Mobile</span>
+                      <div className={`h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ${merchant.widget_mobile_title === '' ? 'w-12' : 'px-4 gap-2'}`} style={{
+                        background: merchant.widget_gradient_color
+                          ? `linear-gradient(135deg, ${merchant.widget_primary_color || '#6c3fff'}, ${merchant.widget_gradient_color})`
+                          : (merchant.widget_primary_color || '#6c3fff'),
+                        color: merchant.widget_btn_text_color || '#ffffff'
+                      }}>
+                        <span style={{fontSize:'18px'}}>🎁</span>
+                        {merchant.widget_mobile_title !== '' && <span>{merchant.widget_mobile_title != null ? merchant.widget_mobile_title : (merchant.widget_title || 'Rewards')}</span>}
                       </div>
                     </div>
                   </div>
