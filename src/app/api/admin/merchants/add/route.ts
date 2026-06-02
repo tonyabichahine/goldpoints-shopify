@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdmin } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 import { Resend } from 'resend'
@@ -83,8 +84,7 @@ function buildDefaultFlows(merchantId: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const pw = req.cookies.get('admin_session')?.value
-  if (pw !== (process.env.ADMIN_PASSWORD || 'admin123')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAdmin(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { shopify_domain, store_name, email, password } = await req.json()
   if (!store_name || !email || !password) return NextResponse.json({ error: 'Store name, email, and password are required.' }, { status: 400 })

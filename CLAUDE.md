@@ -46,7 +46,9 @@ Empty array `[]` response = success.
 | Email | Resend — `resend` npm package |
 | AI | Groq API — LLaMA 3.3 70B (`llama-3.3-70b-versatile`) |
 | Hosting | Vercel — repo: `tonyabichahine/goldpoints-shopify` |
-| Shopify | Partner app — Client ID: `78c3102f2df130e39ee82789e038e7ae` |
+| Shopify | Partner app — Client ID: `2b603dade2f3ba7da18c12d97fd64591` (Unlisted distribution; replaced old `78c3102f2df130e39ee82789e038e7ae`) |
+| Rate limiting | Upstash Redis (`@upstash/ratelimit`) — 5 req/60s per IP on login |
+| WhatsApp | Meta Cloud API — template messages, per-merchant credits |
 
 ## Environment variables (.env.local)
 All secrets live in `Desktop\goldpoints-app\.env.local` — **never commit this file**.
@@ -74,7 +76,7 @@ On Vercel all of these are set as Environment Variables. `TEST_EMAIL` is tempora
 
 ## Shopify Partner app
 - Dashboard: partners.shopify.com
-- Client ID: `78c3102f2df130e39ee82789e038e7ae`
+- Client ID: `2b603dade2f3ba7da18c12d97fd64591` (Unlisted distribution — replaced old `78c3102f2df130e39ee82789e038e7ae`)
 - App URL: `https://goldpoints-shopify.vercel.app`
 - Allowed redirect URL: `https://goldpoints-shopify.vercel.app/api/auth/callback`
 - Scopes: `read_orders,read_customers,write_customers,write_discounts`
@@ -99,11 +101,16 @@ src/
 │   │   │   ├── install/route.ts              # Starts Shopify OAuth
 │   │   │   └── callback/route.ts             # OAuth callback — links to existing merchant
 │   │   ├── webhooks/
-│   │   │   └── orders/
-│   │   │       ├── route.ts                  # Order created → award points + campaign attribution (HMAC verified)
-│   │   │       └── cancelled/route.ts        # Order cancelled → deduct points (HMAC verified)
+│   │   │   ├── orders/
+│   │   │   │   ├── route.ts                  # orders/paid → award points + attribution (HMAC verified; idempotent on shopify_order_id)
+│   │   │   │   └── cancelled/route.ts        # orders/cancelled → deduct points (HMAC verified)
+│   │   │   └── whatsapp/route.ts             # Meta WhatsApp delivery/status webhook
+│   │   ├── track/
+│   │   │   ├── open/route.ts                 # Email open pixel
+│   │   │   └── click/route.ts                # Email link click → records campaign_clicks (attribution)
+│   │   ├── unsub/route.ts                     # One-click email unsubscribe (sets marketing_consent false)
 │   │   ├── cron/
-│   │   │   └── automations/route.ts          # Hourly cron (daily on Hobby) — processes automation_enrollments
+│   │   │   └── automations/route.ts          # Daily cron (CRON_SECRET-protected) — flows, birthday, inactive, pending campaign sends
 │   │   ├── widget/                           # CORS-enabled (called from any Shopify storefront)
 │   │   │   ├── config/route.ts               # Widget settings + active offers for a shop
 │   │   │   ├── register/route.ts             # Legacy customer registration
@@ -130,13 +137,17 @@ src/
 │   │       ├── forgot-password/route.ts      # Merchant forgot password → sends reset email
 │   │       ├── reset-password/route.ts       # Merchant password reset (token validation)
 │   │       ├── customers/route.ts            # Lists customers
+│   │       ├── customers/import/route.ts     # Bulk CSV customer import
 │   │       ├── offers/route.ts               # CRUD offers
-│   │       ├── settings/route.ts             # Saves all widget/points/tier settings
+│   │       ├── settings/route.ts             # Saves all widget/points/tier settings (blocked if trial expired)
+│   │       ├── whatsapp-connect/route.ts     # Connect merchant WhatsApp (Meta) account
+│   │       ├── whatsapp-templates/route.ts   # CRUD/sync WhatsApp message templates
 │   │       ├── campaigns/
 │   │       │   ├── route.ts                  # List campaigns (with attribution stats)
 │   │       │   └── send/route.ts             # Send campaign to segment, save to campaign_sends
 │   │       ├── automations/route.ts          # CRUD legacy automations (trigger-based single email)
 │   │       ├── flows/route.ts                # CRUD visual automation flows (GET/POST/PATCH/DELETE)
+│       ├── flows/test/route.ts           # Test-run a flow | flows/test-email — send a test email
 │   │       ├── analytics/
 │   │       │   ├── route.ts                  # Main analytics: KPIs, 14d charts, top customers, campaign revenue
 │   │       │   ├── detail/route.ts           # Drill-down: points/redemptions/signups/activity/segment
@@ -144,8 +155,10 @@ src/
 │   │       └── ai-insights/route.ts          # AI chat — Groq LLaMA 3.3 70B, context-aware
 ├── lib/
 │   ├── supabase.ts                           # supabase (anon) + supabaseAdmin (service role)
-│   ├── shopify.ts                            # OAuth helpers, getTier(), tagShopifyCustomer(), buildUpgradeBonusData()
-│   └── email.ts                              # fireAutomation() single-email trigger, enrollInFlows() visual flow enrollment
+│   ├── shopify.ts                            # OAuth helpers, getTier(), tagShopifyCustomer(), buildUpgradeBonusData(), createDiscountCode()
+│   ├── email.ts                              # fireAutomation() single-email trigger, enrollInFlows() visual flow enrollment
+│   ├── whatsapp.ts                           # Meta Cloud API senders — sendWhatsApp(), sendWhatsAppPoints()
+│   └── ratelimit.ts                          # checkRateLimit() — Upstash sliding-window per IP
 public/
 ├── widget.js                                 # Embeddable IIFE widget — no dependencies
 └── logo.png                                  # GoldPoints logo
@@ -155,24 +168,31 @@ vercel.json                                   # Cron: /api/cron/automations dail
 ## Database (Supabase) — all tables are live
 | Table | Key columns |
 |---|---|
-| `merchants` | id, shopify_domain, store_name, email, password_hash, active, points_per_dollar, signup_bonus, birthday_bonus, widget_primary_color, widget_btn_text_color, widget_title, widget_position, widget_offset_bottom, widget_offset_side, social_follow_url, follow_points, referral_points, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, shopify_access_token |
+| `merchants` | id, shopify_domain, store_name, email, password_hash, active, **trial_ends_at** (NULL = paid), **is_premium**, points_per_dollar, signup_bonus, birthday_bonus, attribution_window_days, widget_primary_color, widget_gradient_color, widget_btn_text_color, widget_bg_color, widget_title, **widget_mobile_title**, **widget_hidden**, widget_position, widget_offset_bottom, widget_offset_side, widget_store_country, widget_phone_required, social_follow_url, follow_points, referral_points, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, whatsapp_auto_notify, whatsapp_credits, whatsapp_waba_id, whatsapp_phone_number_id, whatsapp_token, custom_from_email, shopify_access_token |
 | `customers` | id, merchant_id, email, name, phone, birthday, marketing_consent, password_hash, points, tier, lifetime_points, referral_code, referred_by, shopify_customer_id, silver_bonus_awarded, gold_bonus_awarded |
 | `offers` | id, merchant_id, name, description, points_required, offer_type, offer_value, active, min_tier |
 | `point_transactions` | id, merchant_id, customer_id, type, points, description, shopify_order_id, created_at |
-| `redemptions` | id, merchant_id, customer_id, offer_id, discount_code, created_at |
-| `campaigns` | id, merchant_id, name, subject, body, segment, sent_at, recipient_count |
-| `campaign_sends` | id, campaign_id, merchant_id, customer_id, sent_at |
-| `campaign_attributions` | id, campaign_id, merchant_id, customer_id, shopify_order_id (UNIQUE), revenue, created_at |
+| `redemptions` | id, merchant_id, customer_id, offer_id, discount_code, points_spent, created_at |
+| `campaigns` | id, merchant_id, name, subject, body, segment, bonus_points, sent_at, recipient_count |
+| `campaign_sends` | id, campaign_id, merchant_id, customer_id, created_at, sent_at |
+| `campaign_clicks` | id, campaign_id, merchant_id, customer_id, clicked_at — drives click-based attribution |
+| `campaign_attributions` | id, campaign_id, merchant_id, customer_id, shopify_order_id (UNIQUE), revenue, attributed_via, created_at |
+| `flow_sends` / `flow_attributions` | per-flow send log + revenue attribution (channel: email/whatsapp) |
 | `automations` | id, merchant_id, name, trigger, subject, body, active |
-| `automation_flows` | id, merchant_id, name, trigger, active, nodes (jsonb), edges (jsonb) |
-| `automation_enrollments` | id, flow_id, customer_id, merchant_id, status, current_node_id, next_run_at |
+| `automation_flows` | id, merchant_id, name, trigger, active, allow_reenroll, nodes (jsonb), edges (jsonb) |
+| `automation_enrollments` | id, flow_id, customer_id, merchant_id, status, current_node_id, next_run_at, enrolled_at, error_count, last_error, last_email_sent_at, last_email_click_at |
 
-**point_transactions.type values:**
-`earn_order`, `earn_signup`, `earn_referral`, `earn_follow`, `earn_birthday`, `redeem`, `deduct_cancel`, `earn_upgrade_silver`, `earn_upgrade_gold`
+**point_transactions.type values (current):**
+`earn_purchase`, `earn_signup`, `earn_referral`, `earn_follow`, `earn_birthday`, `earn_tier_bonus`, `earn_campaign_bonus`, `earn_flow`, `redeem`, `deduct_cancel`
+(Legacy rows may still use `earn_order`; code that filters purchases matches both `earn_purchase` and `earn_order`.)
 
-`deduct_cancel` is inserted when a Shopify order is cancelled — it stores the same `shopify_order_id` as the original `earn_order`. The segmentation logic excludes earn transactions whose `shopify_order_id` appears in any `deduct_cancel` row when computing "last purchase date".
+**Order webhook idempotency:** there is NO unique index on `point_transactions.shopify_order_id`. The orders/paid webhook guards against Shopify's at-least-once redelivery by checking for an existing `earn_purchase`/`earn_order` row for that order id before awarding.
 
-**Campaign attribution:** When an order webhook fires, it checks `campaign_sends` for the customer within 7 days and inserts into `campaign_attributions` (UNIQUE on shopify_order_id — no double-counting).
+`deduct_cancel` is inserted when a Shopify order is cancelled — it stores the same `shopify_order_id` as the original `earn_purchase`. The segmentation logic excludes earn transactions whose `shopify_order_id` appears in any `deduct_cancel` row when computing "last purchase date".
+
+**Atomic redemption:** the `redeem_points(p_customer_id, p_amount)` Postgres RPC decrements points only if the balance still covers the cost (returns new balance, or NULL if not). Redeem deducts via this RPC *before* creating the Shopify discount code, and refunds (negative amount) if code creation fails. Redeem also enforces `offer.min_tier` server-side.
+
+**Campaign attribution:** on order, prefers click-based (`campaign_clicks` within window) then falls back to send-based (`campaign_sends`), inserting into `campaign_attributions` (UNIQUE on shopify_order_id — no double-counting). Window is `merchant.attribution_window_days` (default 7).
 
 ## Tiers
 | Tier | Default min points | Icon |
@@ -206,7 +226,7 @@ Clicking KPI cards or "See all" opens a slide-in drawer. `type` param options:
 API: `GET /api/merchant/analytics/detail?type=X&period=Y` or `?type=segment&segment=active`
 
 ## Customer lifecycle segments
-Computed from last non-cancelled `earn_order` per customer:
+Computed from last non-cancelled `earn_purchase` (or legacy `earn_order`) per customer:
 | Segment | Days since last purchase | Color |
 |---|---|---|
 | Active | ≤ 30 | green |
@@ -214,7 +234,7 @@ Computed from last non-cancelled `earn_order` per customer:
 | Dormant | 61–90 | orange |
 | Lapsing | 91–180 | red |
 | Lost | 180+ | gray |
-| Never Purchased | no earn_order ever | purple |
+| Never Purchased | no earn_purchase ever | purple |
 
 API: `GET /api/merchant/analytics/segments` — returns counts + percentages for the donut chart.
 
@@ -228,7 +248,10 @@ API: `GET /api/merchant/analytics/segments` — returns counts + percentages for
 - Suggested starter questions shown when chat is empty
 
 ## Merchant settings (saveable fields)
-`widget_primary_color`, `widget_btn_text_color`, `widget_position`, `widget_offset_bottom`, `widget_offset_side`, `widget_title`, `points_per_dollar`, `signup_bonus`, `birthday_bonus`, `social_follow_url`, `follow_points`, `referral_points`, `tier_silver`, `tier_gold`
+POST `/api/merchant/settings` allow-list: `widget_primary_color`, `widget_gradient_color`, `widget_btn_text_color`, `widget_bg_color`, `widget_position`, `widget_offset_bottom`, `widget_offset_side`, `widget_title`, `widget_mobile_title`, `widget_hidden`, `widget_store_country`, `widget_phone_required`, `points_per_dollar`, `signup_bonus`, `birthday_bonus`, `social_follow_url`, `follow_points`, `referral_points`, `tier_silver`, `tier_gold`, `tier_bronze_multiplier`, `tier_silver_multiplier`, `tier_gold_multiplier`, `tier_silver_bonus`, `tier_gold_bonus`, `attribution_window_days`, `whatsapp_auto_notify`
+- Returns 402 and saves nothing if the merchant's trial has expired.
+- `widget_mobile_title`: `null`/absent = use desktop title on mobile; `''` (empty) = icon-only on mobile; any string = custom mobile label.
+- `widget_hidden`: hides the storefront widget entirely without uninstalling.
 
 ## Admin
 - URL: `goldpoints-shopify.vercel.app/admin` (not linked — Tony accesses directly)
@@ -277,12 +300,23 @@ API: `GET /api/merchant/analytics/segments` — returns counts + percentages for
 - **Forgot password** — customer (widget) + merchant (dashboard) both have reset email flow
 - GoldPoints logo as favicon and in welcome emails
 
+## Billing & trial (manual — no Stripe)
+- 14-day free trial set via `trial_ends_at` on merchant creation. **`trial_ends_at = NULL` means paid** (Tony clears it in admin once a bank transfer arrives).
+- Payment is manual bank transfer (Bank Audi) — no Stripe (Lebanon unsupported).
+- **Server-side enforcement when expired** (`trial_ends_at` in the past): `/api/widget/config` forces `widget_hidden=true` (widget stops serving on the store) and `/api/merchant/settings` returns 402 (no saves). The dashboard also shows a blocking billing screen client-side.
+
 ## What is NOT yet built
-1. **Email domain** — verify a domain on Resend to send to real merchant emails (remove TEST_EMAIL after) — CRITICAL before real merchants
-2. **Birthday bonus cron** — `birthday_bonus` column + `earn_birthday` type exist; cron stub exists but no actual birthday query yet
-3. **Subscription/billing** — Stripe for merchant payments (needed before charging merchants)
-4. **Automation flows battle-tested** — cron runs daily only (Hobby plan); flow execution logic is new and untested at scale
-5. **Campaign scheduling** — currently campaigns send immediately; no scheduled/future send
+1. **Email domain** — verify a domain on Resend to send to real merchant emails (remove TEST_EMAIL after) — CRITICAL before real merchants. Currently ALL email routes to Tony's Gmail via TEST_EMAIL.
+2. **Automated billing** — payments are manual bank transfer; no Stripe/subscription automation.
+3. **Automation flows battle-tested** — cron runs daily only (Hobby plan); flow execution logic is relatively new and untested at scale.
+4. **Campaign scheduling** — campaigns queue and send via cron; no user-facing future-date scheduling.
+
+> Birthday bonus IS built (cron `enrollBirthdayCustomers` awards `earn_birthday` once/day via the `get_birthday_customers` RPC). WhatsApp notifications, email open/click tracking, unsubscribe, CSV customer import, and rate limiting are all live.
+
+## Known limitations / security notes
+- **Admin auth is weak:** no rate limit on `/api/admin/login`, default password `admin123`, and the session cookie value IS the password. Harden before exposing widely.
+- **Merchant session** is the raw merchant id in an httpOnly cookie (not signed/JWT). Low risk (UUIDs) but not a real token.
+- **Redeem** is now atomic (`redeem_points` RPC) and tier-locked; **orders/paid webhook** is idempotent on `shopify_order_id`.
 
 ## Vercel deployment notes
 - **Hobby plan:** cron limited to DAILY (`0 0 * * *`). Hourly `0 * * * *` silently blocks ALL deployments — do not use.

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdmin } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-
-function isAdmin(req: NextRequest) {
-  return req.cookies.get('admin_session')?.value === (process.env.ADMIN_PASSWORD || 'admin123')
-}
 
 // POST: add domain to Resend, save domain ID + records to merchant
 export async function POST(req: NextRequest) {

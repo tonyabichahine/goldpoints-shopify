@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const merchantId = req.cookies.get('merchant_session')?.value
+  const merchantId = verifyMerchantToken(req.cookies.get('merchant_session')?.value)
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const { data: merchant } = await supabaseAdmin
     .from('merchants')
-    .select('id, store_name, shopify_domain, email, widget_primary_color, widget_btn_text_color, widget_position, widget_offset_bottom, widget_offset_side, widget_title, points_per_dollar, signup_bonus, birthday_bonus, social_follow_url, follow_points, referral_points, shopify_access_token, whatsapp_phone_number_id, whatsapp_waba_id, whatsapp_credits, is_premium, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, trial_ends_at, whatsapp_auto_notify')
+    .select('id, store_name, shopify_domain, email, widget_primary_color, widget_gradient_color, widget_btn_text_color, widget_bg_color, widget_position, widget_offset_bottom, widget_offset_side, widget_title, widget_mobile_title, widget_hidden, widget_store_country, widget_phone_required, points_per_dollar, signup_bonus, birthday_bonus, social_follow_url, follow_points, referral_points, shopify_access_token, whatsapp_phone_number_id, whatsapp_waba_id, whatsapp_credits, is_premium, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus, trial_ends_at, whatsapp_auto_notify')
     .eq('id', merchantId)
     .single()
 

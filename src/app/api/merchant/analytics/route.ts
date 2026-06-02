@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const merchantId = req.cookies.get('merchant_session')?.value
+  const merchantId = verifyMerchantToken(req.cookies.get('merchant_session')?.value)
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()

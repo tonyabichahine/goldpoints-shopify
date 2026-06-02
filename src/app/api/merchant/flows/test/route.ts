@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendEmail, sendFlowEmail } from '@/lib/email'
 import { sendWhatsApp } from '@/lib/whatsapp'
@@ -27,7 +28,7 @@ function evaluateCondition(data: any, customer: any): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const merchantId = req.cookies.get('merchant_session')?.value
+  const merchantId = verifyMerchantToken(req.cookies.get('merchant_session')?.value)
   if (!merchantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { flow_id, customer_email } = await req.json()

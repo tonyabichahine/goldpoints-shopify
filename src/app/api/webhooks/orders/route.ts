@@ -37,6 +37,17 @@ export async function POST(req: NextRequest) {
     .eq('shopify_domain', shop).single()
   if (!merchant) return NextResponse.json({ ok: true })
 
+  // Idempotency: Shopify delivers webhooks at-least-once. If this order was
+  // already awarded points, skip — otherwise a redelivery double-awards.
+  const { data: alreadyAwarded } = await supabaseAdmin
+    .from('point_transactions')
+    .select('id')
+    .eq('merchant_id', merchant.id)
+    .eq('shopify_order_id', String(order.id))
+    .in('type', ['earn_purchase', 'earn_order'])
+    .maybeSingle()
+  if (alreadyAwarded) return NextResponse.json({ ok: true })
+
   const orderTotal = parseFloat(order.total_price || '0')
   const basePoints = Math.floor(orderTotal * merchant.points_per_dollar)
   if (basePoints <= 0) return NextResponse.json({ ok: true })

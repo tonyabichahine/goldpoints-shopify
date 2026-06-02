@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 import { checkRateLimit } from '@/lib/ratelimit'
+import { signMerchantSession, SESSION_COOKIE_OPTS } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   const { limited } = await checkRateLimit(req)
@@ -23,6 +24,6 @@ export async function POST(req: NextRequest) {
   if (!valid) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
 
   const res = NextResponse.json({ ok: true })
-  res.cookies.set('merchant_session', merchant.id, { httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 })
+  res.cookies.set('merchant_session', signMerchantSession(merchant.id), SESSION_COOKIE_OPTS)
   return res
 }

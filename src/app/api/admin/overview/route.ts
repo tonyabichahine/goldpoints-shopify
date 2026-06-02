@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdmin } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const pw = req.cookies.get('admin_session')?.value
-  if (pw !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+  if (!isAdmin(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

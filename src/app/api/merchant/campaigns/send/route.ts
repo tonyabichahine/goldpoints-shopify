@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { buildCampaignEmailPayload } from '@/lib/email'
 import { Resend } from 'resend'
@@ -7,7 +8,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 const BATCH_SIZE = 100
 
 function getMerchantId(req: NextRequest) {
-  return req.cookies.get('merchant_session')?.value || null
+  return verifyMerchantToken(req.cookies.get('merchant_session')?.value)
 }
 
 async function getCancelledOrderIds(merchantId: string): Promise<Set<string>> {

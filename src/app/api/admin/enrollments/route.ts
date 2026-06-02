@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdmin } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-
-function isAdmin(req: NextRequest) {
-  return req.cookies.get('admin_session')?.value === (process.env.ADMIN_PASSWORD || 'admin123')
-}
 
 // GET: counts of errored and active enrollments
 export async function GET(req: NextRequest) {

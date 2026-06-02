@@ -13,11 +13,17 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('merchants')
-    .select('id, store_name, widget_primary_color, widget_gradient_color, widget_btn_text_color, widget_bg_color, widget_position, widget_offset_bottom, widget_offset_side, widget_title, widget_store_country, widget_phone_required, widget_hidden, widget_mobile_title, points_per_dollar, signup_bonus, social_follow_url, follow_points, referral_points, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
+    .select('id, store_name, widget_primary_color, widget_gradient_color, widget_btn_text_color, widget_bg_color, widget_position, widget_offset_bottom, widget_offset_side, widget_title, widget_store_country, widget_phone_required, widget_hidden, widget_mobile_title, trial_ends_at, points_per_dollar, signup_bonus, social_follow_url, follow_points, referral_points, tier_silver, tier_gold, tier_bronze_multiplier, tier_silver_multiplier, tier_gold_multiplier, tier_silver_bonus, tier_gold_bonus')
     .eq('shopify_domain', shop)
     .single()
 
   if (!data) return NextResponse.json({ error: 'Store not found' }, { status: 404, headers: cors })
+
+  // Trial enforcement: if the merchant's trial has lapsed (trial_ends_at set and
+  // in the past — paid merchants have it cleared to NULL), stop serving the
+  // widget. Reuses the widget_hidden path so the button stays invisible.
+  const trialExpired = !!data.trial_ends_at && new Date(data.trial_ends_at) < new Date()
+  if (trialExpired) data.widget_hidden = true
 
   const { data: offers } = await supabaseAdmin
     .from('offers').select('id, name, description, points_required, offer_type, offer_value, min_tier')

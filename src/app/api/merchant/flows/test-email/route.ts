@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
-  const merchantId = req.cookies.get('merchant_session')?.value
+  const merchantId = verifyMerchantToken(req.cookies.get('merchant_session')?.value)
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const { subject, body, to } = await req.json()

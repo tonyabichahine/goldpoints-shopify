@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-function isAdmin(req: NextRequest) {
-  return req.cookies.get('admin_session')?.value === (process.env.ADMIN_PASSWORD || 'admin123')
-}
+import { isAdmin } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

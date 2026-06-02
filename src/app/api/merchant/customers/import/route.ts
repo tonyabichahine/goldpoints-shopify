@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier } from '@/lib/shopify'
 
 export async function POST(req: NextRequest) {
-  const merchantId = req.cookies.get('merchant_session')?.value
+  const merchantId = verifyMerchantToken(req.cookies.get('merchant_session')?.value)
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const text = await req.text()

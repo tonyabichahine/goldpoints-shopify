@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-  const merchantId = req.cookies.get('merchant_session')?.value
+  const merchantId = verifyMerchantToken(req.cookies.get('merchant_session')?.value)
   if (!merchantId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
+  // Trial enforcement: block saving changes once the trial has lapsed
+  // (paid merchants have trial_ends_at cleared to NULL).
+  const { data: m } = await supabaseAdmin.from('merchants').select('trial_ends_at').eq('id', merchantId).single()
+  if (m?.trial_ends_at && new Date(m.trial_ends_at) < new Date()) {
+    return NextResponse.json({ error: 'Your trial has ended. Please complete payment to continue.' }, { status: 402 })
+  }
 
   const body = await req.json()
   const allowed = ['widget_primary_color', 'widget_gradient_color', 'widget_btn_text_color', 'widget_bg_color', 'widget_position', 'widget_offset_bottom', 'widget_offset_side', 'widget_title', 'widget_mobile_title', 'widget_hidden', 'widget_store_country', 'widget_phone_required', 'points_per_dollar', 'signup_bonus', 'birthday_bonus', 'social_follow_url', 'follow_points', 'referral_points', 'tier_silver', 'tier_gold', 'tier_bronze_multiplier', 'tier_silver_multiplier', 'tier_gold_multiplier', 'tier_silver_bonus', 'tier_gold_bonus', 'attribution_window_days', 'whatsapp_auto_notify']

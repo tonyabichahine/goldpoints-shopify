@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMerchantToken } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 async function getMerchantId(req: NextRequest) {
-  return req.cookies.get('merchant_session')?.value || null
+  return verifyMerchantToken(req.cookies.get('merchant_session')?.value)
 }
 
 export async function GET(req: NextRequest) {
