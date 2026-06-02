@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
     try {
       await fetch(webhookBase, { method: 'POST', headers: whHeaders, body: JSON.stringify({ webhook: { topic: 'orders/paid', address: `${APP_URL}/api/webhooks/orders`, format: 'json' } }) })
       await fetch(webhookBase, { method: 'POST', headers: whHeaders, body: JSON.stringify({ webhook: { topic: 'orders/cancelled', address: `${APP_URL}/api/webhooks/orders/cancelled`, format: 'json' } }) })
+      await fetch(webhookBase, { method: 'POST', headers: whHeaders, body: JSON.stringify({ webhook: { topic: 'app/uninstalled', address: `${APP_URL}/api/webhooks/uninstalled`, format: 'json' } }) })
     } catch { /* non-fatal */ }
 
     return res

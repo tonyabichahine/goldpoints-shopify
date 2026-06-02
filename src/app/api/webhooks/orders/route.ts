@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData, SHOPIFY_API_SECRET, tagShopifyCustomer } from '@/lib/shopify'
 import { fireAutomation, enrollInFlows } from '@/lib/email'
 import { sendWhatsAppPoints } from '@/lib/whatsapp'
+import { logError } from '@/lib/log'
 import crypto from 'crypto'
 
 async function awardCampaignBonus(campaignId: string, merchantId: string, customerId: string, currentPoints: number) {
@@ -102,11 +103,11 @@ export async function POST(req: NextRequest) {
   ])
 
   if (effectiveShopifyId) {
-    tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(() => {})
+    tagShopifyCustomer(merchant.shopify_access_token, shop, effectiveShopifyId, newTier).catch(e => logError('orders.tagShopifyCustomer', e))
   }
 
   if (merchant.whatsapp_auto_notify && customer.whatsapp_consent && customer.phone) {
-    sendWhatsAppPoints(merchant.id, customer.phone, customer.name || customerEmail, newPoints, merchant.store_name || '').catch(() => {})
+    sendWhatsAppPoints(merchant.id, customer.phone, customer.name || customerEmail, newPoints, merchant.store_name || '').catch(e => logError('orders.sendWhatsAppPoints', e))
   }
 
   // Campaign attribution: click-based first (stronger), then send-based fallback
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
         shopify_order_id: String(order.id), revenue: orderTotal, attributed_via: 'send',
       })
       await awardCampaignBonus(send.campaign_id, merchant.id, customer.id, newPoints)
-    } catch {}
+    } catch (e) { logError('orders.campaignAttribution', e) }
   })()
 
   // Flow attribution: last-touch within attribution window, split by channel
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
           shopify_order_id: String(order.id), revenue: orderTotal, channel: flowSend.channel,
         })
       }
-    } catch {}
+    } catch (e) { logError('orders.flowAttribution', e) }
   })()
 
   if (newTier !== customer.tier) {
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-    } catch {}
+    } catch (e) { logError('orders.milestoneFlows', e) }
   })()
 
   return NextResponse.json({ ok: true })

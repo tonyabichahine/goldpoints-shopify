@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, SHOPIFY_API_SECRET, tagShopifyCustomer } from '@/lib/shopify'
+import { logError } from '@/lib/log'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   ])
 
   if (customer.shopify_customer_id) {
-    tagShopifyCustomer(merchant.shopify_access_token, shop, customer.shopify_customer_id, newTier).catch(() => {})
+    tagShopifyCustomer(merchant.shopify_access_token, shop, customer.shopify_customer_id, newTier).catch(e => logError('cancelled.tagShopifyCustomer', e))
   }
 
   return NextResponse.json({ ok: true })

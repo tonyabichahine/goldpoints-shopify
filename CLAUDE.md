@@ -61,6 +61,7 @@ SHOPIFY_API_SECRET=<from Shopify Partners dashboard>
 SHOPIFY_SCOPES=read_orders,read_customers,write_customers,write_discounts
 NEXT_PUBLIC_APP_URL=https://goldpoints-shopify.vercel.app
 ADMIN_PASSWORD=admin123
+SESSION_SECRET=<random — signs merchant/admin JWT session cookies; falls back to service-role key if unset>
 GROQ_API_KEY=<from console.groq.com — also set on Vercel>
 RESEND_API_KEY=<from resend.com dashboard — rotate if exposed>
 TEST_EMAIL=tonyabichahine@gmail.com   ← dev only: routes all emails to Tony until domain verified
@@ -104,6 +105,7 @@ src/
 │   │   │   ├── orders/
 │   │   │   │   ├── route.ts                  # orders/paid → award points + attribution (HMAC verified; idempotent on shopify_order_id)
 │   │   │   │   └── cancelled/route.ts        # orders/cancelled → deduct points (HMAC verified)
+│   │   │   ├── uninstalled/route.ts          # app/uninstalled → mark merchant inactive + clear token (HMAC verified)
 │   │   │   └── whatsapp/route.ts             # Meta WhatsApp delivery/status webhook
 │   │   ├── track/
 │   │   │   ├── open/route.ts                 # Email open pixel
@@ -125,7 +127,8 @@ src/
 │   │   │   ├── login/route.ts                # Customer login for specific store
 │   │   │   └── history/route.ts              # Customer transaction history
 │   │   ├── admin/
-│   │   │   ├── login/route.ts                # Sets admin_session cookie
+│   │   │   ├── login/route.ts                # Rate-limited; sets signed admin_session cookie
+│   │   │   ├── reconcile/route.ts            # Recompute customer spendable points from the ledger (safety net)
 │   │   │   ├── overview/route.ts             # Platform stats + all merchants
 │   │   │   └── merchants/
 │   │   │       ├── route.ts                  # PATCH (toggle active) + DELETE merchant
@@ -158,7 +161,10 @@ src/
 │   ├── shopify.ts                            # OAuth helpers, getTier(), tagShopifyCustomer(), buildUpgradeBonusData(), createDiscountCode()
 │   ├── email.ts                              # fireAutomation() single-email trigger, enrollInFlows() visual flow enrollment
 │   ├── whatsapp.ts                           # Meta Cloud API senders — sendWhatsApp(), sendWhatsAppPoints()
-│   └── ratelimit.ts                          # checkRateLimit() — Upstash sliding-window per IP
+│   ├── ratelimit.ts                          # checkRateLimit(req, max?, windowSec?) — Upstash sliding-window per IP
+│   ├── auth.ts                               # Signed JWT sessions — signMerchantSession/verifyMerchantToken/getMerchantId, signAdminSession/isAdmin
+│   ├── log.ts                                # logError() — surfaces background failures into Vercel logs
+│   └── shopify.test.ts                       # Vitest unit tests for getTier() + buildUpgradeBonusData() (`npm test`)
 public/
 ├── widget.js                                 # Embeddable IIFE widget — no dependencies
 └── logo.png                                  # GoldPoints logo
@@ -313,10 +319,21 @@ POST `/api/merchant/settings` allow-list: `widget_primary_color`, `widget_gradie
 
 > Birthday bonus IS built (cron `enrollBirthdayCustomers` awards `earn_birthday` once/day via the `get_birthday_customers` RPC). WhatsApp notifications, email open/click tracking, unsubscribe, CSV customer import, and rate limiting are all live.
 
-## Known limitations / security notes
-- **Admin auth is weak:** no rate limit on `/api/admin/login`, default password `admin123`, and the session cookie value IS the password. Harden before exposing widely.
-- **Merchant session** is the raw merchant id in an httpOnly cookie (not signed/JWT). Low risk (UUIDs) but not a real token.
-- **Redeem** is now atomic (`redeem_points` RPC) and tier-locked; **orders/paid webhook** is idempotent on `shopify_order_id`.
+## Security posture (current)
+- **Sessions are signed JWTs** (`src/lib/auth.ts`) for both merchant and admin — a tampered/forged cookie fails verification. Signed with `SESSION_SECRET` (fallback: service-role key).
+- **Admin login** is rate-limited and stores a signed token (never the password). Password is the `ADMIN_PASSWORD` env var.
+- **Redeem** is atomic (`redeem_points` RPC), tier-locked, and refunds on discount-code failure. **orders/paid webhook** is idempotent on `shopify_order_id`.
+- **Rate limiting** (`checkRateLimit`): login/forgot-password at 5/60s; widget register/profile/redeem/follow at 10/60s per IP. High-frequency reads (config, points) are intentionally unthrottled.
+- **Error visibility:** background failures call `logError()` → Vercel logs (no Sentry yet).
+- **Reconciliation:** `/api/admin/reconcile` (admin-only) recomputes spendable points from the ledger if balances ever drift.
+
+### Still open
+- No off-site database backup yet (Supabase only) — see disaster-recovery discussion; consider Supabase Pro daily backups / PITR before scaling.
+- No GDPR mandatory webhooks (customers/data_request, customers/redact, shop/redact) — only needed if publicly listing on the App Store.
+- `lifetime_points` is updated directly (not ledger-derived); birthday/flow/campaign bonuses add to spendable but not lifetime. Reconcile only fixes spendable points.
+
+## Tests
+`npm test` runs Vitest unit tests (currently `src/lib/shopify.test.ts` — tier + upgrade-bonus logic). Add tests next to the module as `*.test.ts`.
 
 ## Vercel deployment notes
 - **Hobby plan:** cron limited to DAILY (`0 0 * * *`). Hourly `0 * * * *` silently blocks ALL deployments — do not use.

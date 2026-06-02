@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
 import { fireAutomation, enrollInFlows } from '@/lib/email'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -10,6 +11,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const { limited } = await checkRateLimit(req, 10, 60)
+  if (limited) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429, headers: cors })
+
   const { shop, email } = await req.json()
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 

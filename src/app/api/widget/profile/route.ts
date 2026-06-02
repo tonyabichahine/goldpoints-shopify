@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getTier, buildUpgradeBonusData } from '@/lib/shopify'
 import { fireAutomation, enrollInFlows } from '@/lib/email'
 import { sendWhatsAppPoints } from '@/lib/whatsapp'
+import { checkRateLimit } from '@/lib/ratelimit'
 import bcrypt from 'bcryptjs'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
@@ -16,6 +17,9 @@ function genCode() {
 }
 
 export async function POST(req: NextRequest) {
+  const { limited } = await checkRateLimit(req, 10, 60)
+  if (limited) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429, headers: cors })
+
   const { shop, email, name, birthday, marketing_consent, whatsapp_consent, phone, gp_ref, password } = await req.json()
   if (!shop || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: cors })
 
